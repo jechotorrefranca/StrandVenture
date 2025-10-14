@@ -100,14 +100,11 @@ public class DataPrivacyPanelController : MonoBehaviour
         rt.localScale = Vector3.one * entranceStartScale;
         botImage.sprite = idleSprite;
 
-        // ✨ Entrance (rotation + scale + fade)
         yield return StartCoroutine(EntranceAnimation(rt, botGroup));
 
-        // 🌊 Start floating
         if (floatCoroutine != null) StopCoroutine(floatCoroutine);
         floatCoroutine = StartCoroutine(FloatingMotion(rt));
 
-        // 🎤 Play voice + mouth animation
         botAudio.Stop();
         botAudio.Play();
 
@@ -125,23 +122,19 @@ public class DataPrivacyPanelController : MonoBehaviour
 
         botImage.sprite = idleSprite;
 
-        // Stop floating
         if (floatCoroutine != null) StopCoroutine(floatCoroutine);
 
-        // 🌙 Outro (reverse rotation + scale + fade out)
         yield return StartCoroutine(ExitAnimation(rt, botGroup));
 
         botContainer.SetActive(false);
     }
 
-    // 🚀 Entrance animation with fade + rotation + scale
-    // 🚀 Entrance animation with fade + rotation + scale (no Y jump)
     private IEnumerator EntranceAnimation(RectTransform rt, CanvasGroup group)
     {
         float elapsed = 0f;
         Vector2 startPos = rt.anchoredPosition;
-        float startY = startPos.y; // keep current Y position
-        float endY = startY;       // no change in Y
+        float startY = startPos.y; 
+        float endY = startY;     
 
         while (elapsed < entranceDuration)
         {
@@ -154,7 +147,6 @@ public class DataPrivacyPanelController : MonoBehaviour
             rt.localScale = Vector3.one * scale;
             group.alpha = alpha;
 
-            // keep Y smooth if you want a subtle “rise in” effect
             rt.anchoredPosition = new Vector2(rt.anchoredPosition.x, Mathf.Lerp(startY - 5f, endY, t));
 
             elapsed += Time.deltaTime;
@@ -167,7 +159,6 @@ public class DataPrivacyPanelController : MonoBehaviour
     }
 
 
-    // 🌌 Exit animation with fade + rotation + scale
     private IEnumerator ExitAnimation(RectTransform rt, CanvasGroup group)
     {
         float elapsed = 0f;
@@ -191,8 +182,6 @@ public class DataPrivacyPanelController : MonoBehaviour
         group.alpha = 0f;
     }
 
-    // 🪶 Floating idle motion
-    // 🪶 Floating idle motion (starts smoothly from final position)
     private IEnumerator FloatingMotion(RectTransform rt)
     {
         Vector2 startPos = rt.anchoredPosition;
