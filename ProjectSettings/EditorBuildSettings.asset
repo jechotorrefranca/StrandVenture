@@ -12,7 +12,7 @@ EditorBuildSettings:
     path: Assets/Scenes/TitleScreen.unity
     guid: 4efec8cdee578fc41b6e364ead4cc2d1
   - enabled: 1
-    path: Assets/Scenes/ExamScene.unity
+    path: Assets/Scenes/UserInfoScene.unity
     guid: cdadc70cd2fc29448b99cc614642a7a6
   m_configObjects:
     com.unity.input.settings: {fileID: 11400000, guid: 9e7be553448fa2546aea5752021cbcf7,

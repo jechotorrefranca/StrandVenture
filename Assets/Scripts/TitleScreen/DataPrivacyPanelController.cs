@@ -39,6 +39,11 @@ public class DataPrivacyPanelController : MonoBehaviour
     private Coroutine floatCoroutine = null;
     private bool isPanelOpen = false;
 
+    [Header("Scene Transition")]
+    public CanvasGroup fadeOverlay;
+    public float fadeDuration = 1f;
+
+
     void Start()
     {
         dataPrivacyPanel.SetActive(false);
@@ -203,8 +208,35 @@ public class DataPrivacyPanelController : MonoBehaviour
     private void OnAgreeClicked()
     {
         StopBotIfRunning();
-        SceneManager.LoadScene("ExamScene");
+        StartCoroutine(FadeAndLoadScene("UserInfoScene"));
     }
+
+    private IEnumerator FadeAndLoadScene(string sceneName)
+    {
+        fadeOverlay.gameObject.SetActive(true);
+        fadeOverlay.alpha = 0f;
+
+        // Optional: fade out the music slightly before transition
+        var bgm = FindObjectOfType<BGMManager>();
+        if (bgm != null)
+            bgm.FadeOut(1.0f);
+
+        float elapsed = 0f;
+        while (elapsed < fadeDuration)
+        {
+            fadeOverlay.alpha = Mathf.Lerp(0f, 1f, elapsed / fadeDuration);
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        fadeOverlay.alpha = 1f;
+        yield return new WaitForSeconds(0.2f);
+
+        SceneManager.LoadScene(sceneName);
+    }
+
+
+
 
     private void OnCloseClicked()
     {
