@@ -1,0 +1,84 @@
+{
+  "questions": [
+    {
+      "strand": "ABM",
+      "text": "Which of the following best represents good financial management?",
+      "options": [
+        "Spending all your income on leisure",
+        "Avoiding making any budget plans",
+        "Keeping track of your expenses and savings",
+        "Ignoring all your financial records"
+      ],
+      "answerIndex": 2
+    },
+    {
+      "strand": "ABM",
+      "text": "What does ROI stand for in business?",
+      "options": ["Rate of Investment", "Return on Investment", "Revenue of Income", "Record of Inventory"],
+      "answerIndex": 1
+    },
+    {
+      "strand": "ABM",
+      "text": "Which department focuses on managing money and profits?",
+      "options": ["Finance", "Human Resources", "Research", "Marketing"],
+      "answerIndex": 0
+    },
+
+    {
+      "strand": "HUMSS",
+      "text": "Which activity improves your communication skills?",
+      "options": ["Reading and discussing books", "Sleeping all day", "Watching random videos", "Ignoring others"],
+      "answerIndex": 0
+    },
+    {
+      "strand": "HUMSS",
+      "text": "A person who studies people and societies is called a ______.",
+      "options": ["Chemist", "Sociologist", "Engineer", "Physicist"],
+      "answerIndex": 1
+    },
+    {
+      "strand": "HUMSS",
+      "text": "What career is commonly linked with HUMSS?",
+      "options": ["Accountant", "Psychologist", "Programmer", "Architect"],
+      "answerIndex": 1
+    },
+
+    {
+      "strand": "STEM",
+      "text": "What does DNA stand for?",
+      "options": ["Dynamic Network Array", "Deoxyribonucleic Acid", "Digital Neural Algorithm", "None of the above"],
+      "answerIndex": 1
+    },
+    {
+      "strand": "STEM",
+      "text": "Which branch of science studies matter and energy?",
+      "options": ["History", "Physics", "Economics", "Sociology"],
+      "answerIndex": 1
+    },
+    {
+      "strand": "STEM",
+      "text": "Which tool is used to measure electric current?",
+      "options": ["Thermometer", "Ammeter", "Microscope", "Compass"],
+      "answerIndex": 1
+    },
+
+    {
+      "strand": "ICT",
+      "text": "Which of the following is an example of a programming language?",
+      "options": ["HTML", "Python", "Google", "Excel"],
+      "answerIndex": 1
+    },
+    {
+      "strand": "ICT",
+      "text": "What does 'CPU' stand for?",
+      "options": ["Central Processing Unit", "Computer Power Unit", "Control Program Utility", "Core Process User"],
+      "answerIndex": 0
+    },
+    {
+      "strand": "ICT",
+      "text": "Which device is used to store data permanently?",
+      "options": ["RAM", "Hard Drive", "Cache", "Processor"],
+      "answerIndex": 1
+    }
+  ]
+}
