@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using UnityEngine.SceneManagement;
 using System.Collections;
 
 public class AptitudeBotController : MonoBehaviour
@@ -11,25 +12,29 @@ public class AptitudeBotController : MonoBehaviour
     public Sprite idleSprite;
     public Sprite talkingSprite;
     public AudioSource botAudio;
-    public AudioClip botDialogueClip; // 🎧 Personalized MP3
+    public AudioClip botDialogueClip;
     public float entranceDuration = 1f;
     public float floatAmplitude = 10f;
     public float floatSpeed = 1.5f;
     public float volumeThreshold = 0.02f;
 
+    [Header("Outro Settings")]
+    public AudioClip examCompleteClip;
+    public GameObject fadeOverlay;
+    public string nextSceneName = "AptitudeResultScene";
+
     [Header("Exam UI")]
     public GameObject examCanvas;
-
+    public GameObject startPanel;
+    public Button startButton;
 
     private Vector2 botOriginalPos;
     private Coroutine floatCoroutine;
 
     void Start()
     {
-        // Hide bot and exam at start
         botContainer.SetActive(false);
         examCanvas.SetActive(false);
-
 
         botOriginalPos = botContainer.GetComponent<RectTransform>().anchoredPosition;
         var rt = botContainer.GetComponent<RectTransform>();
@@ -40,13 +45,11 @@ public class AptitudeBotController : MonoBehaviour
 
     private IEnumerator SceneSequence()
     {
-        yield return new WaitForSeconds(0.5f); // short delay before showing bot
+        yield return new WaitForSeconds(0.5f);
 
-        // 🟢 Bot Entrance
         botContainer.SetActive(true);
         yield return StartCoroutine(BotEntranceAnimation());
 
-        // 🗣️ Play local MP3 with reactive talk animation
         if (botDialogueClip != null)
         {
             botAudio.clip = botDialogueClip;
@@ -60,15 +63,86 @@ public class AptitudeBotController : MonoBehaviour
 
         yield return new WaitForSeconds(0.5f);
 
-        // ☁️ Exit Upward
         yield return StartCoroutine(BotExitUpward());
 
-        // 🎓 Show Exam UI
-        // 🎓 Show Exam UI with fade animation
         yield return new WaitForSeconds(0.3f);
         yield return StartCoroutine(ShowExamCanvas());
-        floatCoroutine = StartCoroutine(BotFloatingMotion());
 
+        floatCoroutine = StartCoroutine(BotFloatingMotion());
+    }
+
+    public IEnumerator PlayExamCompleteSequence()
+    {
+        CanvasGroup examGroup = examCanvas.GetComponent<CanvasGroup>();
+        if (examGroup == null)
+            examGroup = examCanvas.AddComponent<CanvasGroup>();
+
+        float fadeDuration = 0.8f;
+        float elapsed = 0f;
+
+        while (elapsed < fadeDuration)
+        {
+            float t = Mathf.SmoothStep(0f, 1f, elapsed / fadeDuration);
+            examGroup.alpha = 1f - t;
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        examCanvas.SetActive(false);
+
+        if (floatCoroutine != null)
+        {
+            StopCoroutine(floatCoroutine);
+            floatCoroutine = null;
+        }
+
+        botContainer.SetActive(true);
+        yield return StartCoroutine(BotEntranceAnimation());
+
+        if (examCompleteClip != null)
+        {
+            botAudio.clip = examCompleteClip;
+            botAudio.Play();
+            yield return StartCoroutine(BotTalkAnimation());
+        }
+        else
+        {
+            Debug.LogWarning("⚠️ Missing examCompleteClip!");
+            yield return new WaitForSeconds(2f);
+        }
+
+        if (fadeOverlay != null)
+            yield return StartCoroutine(FadeOverlayAndLoadScene());
+        else
+            Debug.LogWarning("⚠️ Missing fadeOverlay! Scene will not transition.");
+    }
+
+    private IEnumerator FadeOverlayAndLoadScene()
+    {
+        fadeOverlay.SetActive(true);
+        Image overlayImage = fadeOverlay.GetComponent<Image>();
+        Color color = overlayImage.color;
+
+        float duration = 1.5f;
+        float elapsed = 0f;
+
+        color.a = 0f;
+        overlayImage.color = color;
+
+        while (elapsed < duration)
+        {
+            float t = Mathf.SmoothStep(0f, 1f, elapsed / duration);
+            color.a = t;
+            overlayImage.color = color;
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        color.a = 1f;
+        overlayImage.color = color;
+
+        Debug.Log("Exam Finished — loading result scene...");
+        SceneManager.LoadScene(nextSceneName);
     }
 
     // --- BOT ANIMATIONS ---
@@ -180,5 +254,4 @@ public class AptitudeBotController : MonoBehaviour
         group.alpha = 1f;
         rt.localScale = Vector3.one;
     }
-
 }
