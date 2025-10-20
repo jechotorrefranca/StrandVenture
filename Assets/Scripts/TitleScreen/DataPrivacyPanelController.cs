@@ -42,6 +42,7 @@ public class DataPrivacyPanelController : MonoBehaviour
     [Header("Scene Transition")]
     public CanvasGroup fadeOverlay;
     public float fadeDuration = 1f;
+    private bool isTransitioning = false;
 
 
     void Start()
@@ -138,8 +139,8 @@ public class DataPrivacyPanelController : MonoBehaviour
     {
         float elapsed = 0f;
         Vector2 startPos = rt.anchoredPosition;
-        float startY = startPos.y; 
-        float endY = startY;     
+        float startY = startPos.y;
+        float endY = startY;
 
         while (elapsed < entranceDuration)
         {
@@ -205,8 +206,11 @@ public class DataPrivacyPanelController : MonoBehaviour
         agreeButton.interactable = isOn;
     }
 
-    private void OnAgreeClicked()
+    public void OnAgreeClicked()
     {
+        if (isTransitioning) return;
+        isTransitioning = true;
+
         StopBotIfRunning();
         StartCoroutine(FadeAndLoadScene("UserInfoScene"));
     }
@@ -216,7 +220,7 @@ public class DataPrivacyPanelController : MonoBehaviour
         fadeOverlay.gameObject.SetActive(true);
         fadeOverlay.alpha = 0f;
 
-        // Optional: fade out the music slightly before transition
+        // Optional: fade out background music
         var bgm = FindObjectOfType<BGMManager>();
         if (bgm != null)
             bgm.FadeOut(1.0f);
@@ -230,11 +234,11 @@ public class DataPrivacyPanelController : MonoBehaviour
         }
 
         fadeOverlay.alpha = 1f;
-        yield return new WaitForSeconds(0.2f);
+        yield return new WaitForSeconds(0.2f); // short pause for polish
 
-        SceneManager.LoadScene(sceneName);
+        // Now call your Loading system
+        SceneLoader.LoadSceneWithLoading(sceneName);
     }
-
 
 
 

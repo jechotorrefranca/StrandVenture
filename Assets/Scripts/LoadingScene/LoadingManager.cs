@@ -21,14 +21,47 @@ public class LoadingManager : MonoBehaviour
     public float fadeDuration = 1f;
     private string nextSceneName;
 
-
     [Header("Bot Animation")]
     public float spinSpeed = 50f;
+
+    // Shuffled lists that persist
+    private List<Sprite> shuffledImages;
+    private List<string> shuffledTips;
+    private int imageIndex = 0;
+    private int tipIndex = 0;
 
     void Start()
     {
         nextSceneName = SceneLoader.GetNextScene();
+
+        // Initialize shuffled lists immediately
+        InitializeShuffledLists();
+
         StartCoroutine(LoadingSequence());
+    }
+
+    private void InitializeShuffledLists()
+    {
+        // Create and shuffle the lists once
+        shuffledImages = new List<Sprite>(backgroundImages);
+        shuffledTips = new List<string>(loadingTips);
+        ShuffleList(shuffledImages);
+        ShuffleList(shuffledTips);
+
+        // Set the FIRST image and tip immediately (before any fade)
+        if (shuffledImages.Count > 0)
+        {
+            backgroundImage.sprite = shuffledImages[0];
+            backgroundImage.color = new Color(1, 1, 1, 1);
+            imageIndex = 1; // Start from second image in the cycle
+        }
+
+        if (shuffledTips.Count > 0)
+        {
+            tipText.text = shuffledTips[0];
+            tipText.color = new Color(tipText.color.r, tipText.color.g, tipText.color.b, 1);
+            tipIndex = 1; // Start from second tip in the cycle
+        }
     }
 
     private IEnumerator LoadingSequence()
@@ -37,13 +70,13 @@ public class LoadingManager : MonoBehaviour
         loadingText.text = "Loading";
         botImage.transform.localRotation = Quaternion.identity;
 
-        // Fade in from black
-        yield return StartCoroutine(Fade(1, 0, fadeDuration));
-
-        // Start synchronized visuals
+        // Start all animations immediately (don't wait)
         StartCoroutine(CycleBackgroundAndTip());
         StartCoroutine(AnimateBot());
         StartCoroutine(AnimateLoadingText());
+
+        // Fade in from black (runs concurrently with animations)
+        StartCoroutine(Fade(1, 0, fadeDuration));
 
         // Load next scene asynchronously
         yield return StartCoroutine(LoadNextScene());
@@ -86,14 +119,8 @@ public class LoadingManager : MonoBehaviour
         if (backgroundImages.Count == 0)
             yield break;
 
-        // Clone and shuffle the lists once at start
-        List<Sprite> shuffledImages = new List<Sprite>(backgroundImages);
-        List<string> shuffledTips = new List<string>(loadingTips);
-        ShuffleList(shuffledImages);
-        ShuffleList(shuffledTips);
-
-        int imageIndex = 0;
-        int tipIndex = 0;
+        // Wait for the initial display time before first transition
+        yield return new WaitForSeconds(imageSwitchInterval);
 
         Image tempImage = new GameObject("TempImage").AddComponent<Image>();
         tempImage.transform.SetParent(backgroundImage.transform.parent, false);
@@ -155,7 +182,6 @@ public class LoadingManager : MonoBehaviour
         }
     }
 
-
     private void ShuffleList<T>(List<T> list)
     {
         for (int i = 0; i < list.Count; i++)
@@ -164,7 +190,6 @@ public class LoadingManager : MonoBehaviour
             (list[i], list[randomIndex]) = (list[randomIndex], list[i]);
         }
     }
-
 
     private IEnumerator FadeTextAlpha(TMP_Text text, float start, float end, float duration)
     {
@@ -185,20 +210,22 @@ public class LoadingManager : MonoBehaviour
         Vector3 startPos = botImage.rectTransform.anchoredPosition;
         float floatAmplitude = 10f; // how high it moves up/down
         float floatSpeed = 2f;      // how fast it moves
+        float animTime = 0f;
 
         while (true)
         {
+            animTime += Time.deltaTime;
+
             // 🌀 Rotate
             botImage.transform.Rotate(Vector3.forward, spinSpeed * Time.deltaTime);
 
-            // 🌊 Float (sin wave motion)
-            float newY = startPos.y + Mathf.Sin(Time.time * floatSpeed) * floatAmplitude;
+            // 🌊 Float (sin wave motion) - starts from a random point in the cycle
+            float newY = startPos.y + Mathf.Sin(animTime * floatSpeed) * floatAmplitude;
             botImage.rectTransform.anchoredPosition = new Vector2(startPos.x, newY);
 
             yield return null;
         }
     }
-
 
     private IEnumerator AnimateLoadingText()
     {

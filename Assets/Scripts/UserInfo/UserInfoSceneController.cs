@@ -55,6 +55,12 @@ public class UserInfoSceneController : MonoBehaviour
     private bool isNameValid = false;
     private bool isSectionValid = false;
 
+    [Header("Extra Audio Clips")]
+    public AudioClip errorClip;
+    public AudioClip getReadyClip;
+
+
+
 
 
     void Start()
@@ -95,20 +101,31 @@ public class UserInfoSceneController : MonoBehaviour
 
     private void LoadGroqApiKey()
     {
-        string path = Path.Combine(Application.dataPath, "../groq_config.json");
+
+        string path;
+
+#if UNITY_EDITOR
+        path = Path.Combine(Application.dataPath, "../groq_config.json");
+#else
+        path = Path.Combine(Application.streamingAssetsPath, "groq_config.json");
+#endif
+
+        Debug.Log("Looking for config at: " + path);
 
         if (File.Exists(path))
         {
             string json = File.ReadAllText(path);
             GroqConfig config = JsonUtility.FromJson<GroqConfig>(json);
-
-            apiKey = config.api_key; // ✅ correctly assign it to the field
-            Debug.Log("Groq API key loaded successfully: " + apiKey);
+            apiKey = config.api_key;
+            Debug.Log("API Key loaded successfully!");
         }
         else
         {
             Debug.LogError("groq_config.json not found at: " + path);
+            Debug.LogError("Current Application.dataPath: " + Application.dataPath);
+            Debug.LogError("Current Application.streamingAssetsPath: " + Application.streamingAssetsPath);
         }
+
     }
     private void ValidateForm()
     {
@@ -177,7 +194,7 @@ public class UserInfoSceneController : MonoBehaviour
     {
         string url = "https://api.groq.com/openai/v1/chat/completions";
 
-        string prompt = $"From this full name: '{fullName}', return only the most natural first name or nickname that a friend would use, don't change the name. ";
+        string prompt = $"From this full name: '{fullName}', return only the most natural first name or nickname that a friend would use, don't change the name. In case of people having 2 first name like john adrian, return what would be the most common people would call them, like adrian.";
 
         ChatRequest chatRequest = new ChatRequest
         {
@@ -223,7 +240,7 @@ public class UserInfoSceneController : MonoBehaviour
         }
     }
 
-    private IEnumerator PlayGroqTTS(string text)
+    private IEnumerator PlayGroqTTS(string text, System.Action<bool> onComplete)
     {
         string url = "https://api.groq.com/openai/v1/audio/speech";
 
@@ -254,32 +271,34 @@ public class UserInfoSceneController : MonoBehaviour
             {
                 Debug.LogError("❌ TTS Error: " + request.error);
                 Debug.LogError("Response: " + request.downloadHandler.text);
+                onComplete?.Invoke(false);
+                yield break;
+            }
+
+            byte[] audioData = request.downloadHandler.data;
+            if (audioData == null || audioData.Length == 0)
+            {
+                Debug.LogError("⚠️ Empty audio response.");
+                onComplete?.Invoke(false);
+                yield break;
+            }
+
+            AudioClip clip = WavUtility.ToAudioClip(audioData, 0, "GroqTTSClip");
+            if (clip != null)
+            {
+                botAudio.clip = clip;
+                botAudio.Play();
+                yield return StartCoroutine(BotTalkAnimation());
+                onComplete?.Invoke(true);
             }
             else
             {
-                Debug.Log("✅ TTS Request Successful! Bytes: " + request.downloadHandler.data.Length);
-                byte[] audioData = request.downloadHandler.data;
-
-                if (audioData == null || audioData.Length == 0)
-                {
-                    Debug.LogError("⚠️ Empty audio response.");
-                    yield break;
-                }
-
-                AudioClip clip = WavUtility.ToAudioClip(audioData, 0, "GroqTTSClip");
-                if (clip != null)
-                {
-                    botAudio.clip = clip;
-                    botAudio.Play();
-                    yield return StartCoroutine(BotTalkAnimation());
-                }
-                else
-                {
-                    Debug.LogError("Failed to decode audio clip.");
-                }
+                Debug.LogError("Failed to decode audio clip.");
+                onComplete?.Invoke(false);
             }
         }
     }
+
 
 
     private IEnumerator SaveSequenceAfterClick()
@@ -325,15 +344,42 @@ public class UserInfoSceneController : MonoBehaviour
 
         botRT.anchoredPosition = endPos;
 
-        // 🔊 Goodbye message with nickname (Groq TTS)
+        // 🔊 Goodbye message using TTS (with "Awwwesome name" inside)
         string nickname = PlayerPrefs.GetString("PlayerNickname", "friend");
-        yield return StartCoroutine(PlayGroqTTS($"{nickname}! what a nice name, we'll now start your strand venture experience!"));
+        bool ttsSuccess = false;
 
+        // TTS will handle the whole line
+        string ttsLine = $"(Excited) Awesome name, {nickname}!";
+        yield return StartCoroutine(PlayGroqTTS(ttsLine, success => ttsSuccess = success));
+
+        if (!ttsSuccess)
+        {
+            // fallback audio if TTS failed
+            if (errorClip != null)
+            {
+                botAudio.clip = errorClip;
+                botAudio.Play();
+                yield return StartCoroutine(BotTalkAnimation());
+            }
+        }
+        else
+        {
+            // optional short delay after TTS before next clip
+            yield return new WaitForSeconds(0.3f);
+        }
+
+        // Final "Get ready" clip for smoother closure
+        if (getReadyClip != null)
+        {
+            botAudio.clip = getReadyClip;
+            botAudio.Play();
+            yield return StartCoroutine(BotTalkAnimation());
+        }
 
         yield return new WaitForSeconds(0.5f);
         yield return StartCoroutine(FadeCanvas(fadeOverlay, 0f, 1f, 1f));
 
-        Debug.Log("Fade complete — ready for next scene transition.");
+        SceneLoader.LoadSceneWithLoading("ExamScene");
     }
 
     private IEnumerator BotAndTextboxExitTogether()

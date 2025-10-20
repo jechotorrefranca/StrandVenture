@@ -141,7 +141,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &503106248
 RectTransform:
   m_ObjectHideFlags: 0
@@ -496,9 +496,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 'Tip Tip Tip Tip Tip Tip Tip Tip Tip Tip Tip Tip Tip Tip Tip Tip Tip Tip
-    Tip Tip Tip Tip Tip Tip Tip Tip Tip Tip Tip Tip Tip Tip Tip Tip Tip Tip Tip Tip
-    Tip '
+  m_text: StrandVenture is made by Jocas, Jecho, Adrian, and Neil from BSCS-4A
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: ea5a62bb74d16a049815f5b119809384, type: 2}
   m_sharedMaterial: {fileID: 8437622273908661436, guid: ea5a62bb74d16a049815f5b119809384,
