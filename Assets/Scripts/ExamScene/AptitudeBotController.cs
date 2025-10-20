@@ -46,6 +46,9 @@ public class AptitudeBotController : MonoBehaviour
     private IEnumerator SceneSequence()
     {
         yield return new WaitForSeconds(0.5f);
+        yield return StartCoroutine(FadeOverlayEntrance());
+
+        yield return new WaitForSeconds(0.5f);
 
         botContainer.SetActive(true);
         yield return StartCoroutine(BotEntranceAnimation());
@@ -58,7 +61,7 @@ public class AptitudeBotController : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("⚠️ Missing botDialogueClip! Please assign your MP3 file in the Inspector.");
+            Debug.LogWarning("Missing botDialogueClip! Please assign your MP3 file in the Inspector.");
         }
 
         yield return new WaitForSeconds(0.5f);
@@ -71,51 +74,34 @@ public class AptitudeBotController : MonoBehaviour
         floatCoroutine = StartCoroutine(BotFloatingMotion());
     }
 
-    public IEnumerator PlayExamCompleteSequence()
+    private IEnumerator FadeOverlayEntrance()
     {
-        CanvasGroup examGroup = examCanvas.GetComponent<CanvasGroup>();
-        if (examGroup == null)
-            examGroup = examCanvas.AddComponent<CanvasGroup>();
+        fadeOverlay.SetActive(true);
+        Image overlayImage = fadeOverlay.GetComponent<Image>();
+        Color color = overlayImage.color;
 
-        float fadeDuration = 0.8f;
+        float duration = 1.5f;
         float elapsed = 0f;
 
-        while (elapsed < fadeDuration)
+        color.a = 1f;
+        overlayImage.color = color;
+
+        while (elapsed < duration)
         {
-            float t = Mathf.SmoothStep(0f, 1f, elapsed / fadeDuration);
-            examGroup.alpha = 1f - t;
+            float t = Mathf.SmoothStep(0f, 1f, elapsed / duration);
+            color.a = 1f - t;  // Changed this line to fade from 1 to 0
+            overlayImage.color = color;
             elapsed += Time.deltaTime;
             yield return null;
         }
 
-        examCanvas.SetActive(false);
+        color.a = 0f;
+        overlayImage.color = color;
 
-        if (floatCoroutine != null)
-        {
-            StopCoroutine(floatCoroutine);
-            floatCoroutine = null;
-        }
-
-        botContainer.SetActive(true);
-        yield return StartCoroutine(BotEntranceAnimation());
-
-        if (examCompleteClip != null)
-        {
-            botAudio.clip = examCompleteClip;
-            botAudio.Play();
-            yield return StartCoroutine(BotTalkAnimation());
-        }
-        else
-        {
-            Debug.LogWarning("⚠️ Missing examCompleteClip!");
-            yield return new WaitForSeconds(2f);
-        }
-
-        if (fadeOverlay != null)
-            yield return StartCoroutine(FadeOverlayAndLoadScene());
-        else
-            Debug.LogWarning("⚠️ Missing fadeOverlay! Scene will not transition.");
+        fadeOverlay.SetActive(false);
     }
+
+
 
     private IEnumerator FadeOverlayAndLoadScene()
     {
@@ -253,5 +239,51 @@ public class AptitudeBotController : MonoBehaviour
 
         group.alpha = 1f;
         rt.localScale = Vector3.one;
+    }
+
+    public IEnumerator PlayExamCompleteSequence()
+    {
+        CanvasGroup examGroup = examCanvas.GetComponent<CanvasGroup>();
+        if (examGroup == null)
+            examGroup = examCanvas.AddComponent<CanvasGroup>();
+
+        float fadeDuration = 0.8f;
+        float elapsed = 0f;
+
+        while (elapsed < fadeDuration)
+        {
+            float t = Mathf.SmoothStep(0f, 1f, elapsed / fadeDuration);
+            examGroup.alpha = 1f - t;
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        examCanvas.SetActive(false);
+
+        if (floatCoroutine != null)
+        {
+            StopCoroutine(floatCoroutine);
+            floatCoroutine = null;
+        }
+
+        botContainer.SetActive(true);
+        yield return StartCoroutine(BotEntranceAnimation());
+
+        if (examCompleteClip != null)
+        {
+            botAudio.clip = examCompleteClip;
+            botAudio.Play();
+            yield return StartCoroutine(BotTalkAnimation());
+        }
+        else
+        {
+            Debug.LogWarning("Missing examCompleteClip!");
+            yield return new WaitForSeconds(2f);
+        }
+
+        if (fadeOverlay != null)
+            yield return StartCoroutine(FadeOverlayAndLoadScene());
+        else
+            Debug.LogWarning("Missing fadeOverlay! Scene will not transition.");
     }
 }

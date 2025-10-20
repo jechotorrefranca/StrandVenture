@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
+using System.IO;
 using UnityEngine.Video;
 using System.Collections;
 using TMPro;
@@ -8,8 +9,17 @@ using System.Collections.Generic;
 using System.Text;
 using UnityEngine.Networking;
 
+[System.Serializable]
+public class GroqConfig
+{
+    public string api_key;
+}
+
+
 public class UserInfoSceneController : MonoBehaviour
 {
+    private string apiKey;
+
     [Header("Scene Elements")]
     public CanvasGroup fadeOverlay;
     public VideoPlayer backgroundVideo;
@@ -46,8 +56,11 @@ public class UserInfoSceneController : MonoBehaviour
     private bool isSectionValid = false;
 
 
+
     void Start()
     {
+        LoadGroqApiKey();
+
         fadeOverlay.blocksRaycasts = true; // Default for fade-in
 
 
@@ -78,6 +91,24 @@ public class UserInfoSceneController : MonoBehaviour
 
         saveButton.onClick.AddListener(OnSaveButtonClicked);
 
+    }
+
+    private void LoadGroqApiKey()
+    {
+        string path = Path.Combine(Application.dataPath, "../groq_config.json");
+
+        if (File.Exists(path))
+        {
+            string json = File.ReadAllText(path);
+            GroqConfig config = JsonUtility.FromJson<GroqConfig>(json);
+
+            apiKey = config.api_key; // ✅ correctly assign it to the field
+            Debug.Log("Groq API key loaded successfully: " + apiKey);
+        }
+        else
+        {
+            Debug.LogError("groq_config.json not found at: " + path);
+        }
     }
     private void ValidateForm()
     {
@@ -144,7 +175,6 @@ public class UserInfoSceneController : MonoBehaviour
 
     private IEnumerator GetGroqNickname(string fullName)
     {
-        string apiKey = "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";  // replace with your working key
         string url = "https://api.groq.com/openai/v1/chat/completions";
 
         string prompt = $"From this full name: '{fullName}', return only the most natural first name or nickname that a friend would use, don't change the name. ";
@@ -195,7 +225,6 @@ public class UserInfoSceneController : MonoBehaviour
 
     private IEnumerator PlayGroqTTS(string text)
     {
-        string apiKey = "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";
         string url = "https://api.groq.com/openai/v1/audio/speech";
 
         SpeechRequest payload = new SpeechRequest
