@@ -234,9 +234,8 @@ public class DataPrivacyPanelController : MonoBehaviour
         }
 
         fadeOverlay.alpha = 1f;
-        yield return new WaitForSeconds(0.2f); // short pause for polish
+        yield return new WaitForSeconds(0.2f);
 
-        // Now call your Loading system
         SceneLoader.LoadSceneWithLoading(sceneName);
     }
 

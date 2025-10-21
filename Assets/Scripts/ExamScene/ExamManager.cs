@@ -157,7 +157,6 @@ public class ExamManager : MonoBehaviour
     {
         float totalQuestions = questions.Count;
 
-        // Track best score and handle ties
         float bestScore = 0f;
         List<string> bestStrands = new List<string>();
 
@@ -178,13 +177,11 @@ public class ExamManager : MonoBehaviour
 
         float avgTime = totalTime / totalQuestions;
 
-        // Save results — multiple strands if tied
         string bestStrandCombined = string.Join(",", bestStrands);
         PlayerPrefs.SetString("BestStrand", bestStrandCombined);
         PlayerPrefs.SetFloat("BestScore", bestScore);
         PlayerPrefs.SetFloat("AvgAnswerTime", avgTime);
 
-        // Save detailed strand data
         foreach (var strand in strandScores.Keys)
         {
             float strandScore = ((float)strandScores[strand] / (float)strandQuestionCounts[strand]) * 100f;

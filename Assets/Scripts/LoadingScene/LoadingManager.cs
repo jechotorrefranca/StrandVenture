@@ -24,7 +24,6 @@ public class LoadingManager : MonoBehaviour
     [Header("Bot Animation")]
     public float spinSpeed = 50f;
 
-    // Shuffled lists that persist
     private List<Sprite> shuffledImages;
     private List<string> shuffledTips;
     private int imageIndex = 0;
@@ -34,7 +33,6 @@ public class LoadingManager : MonoBehaviour
     {
         nextSceneName = SceneLoader.GetNextScene();
 
-        // Initialize shuffled lists immediately
         InitializeShuffledLists();
 
         StartCoroutine(LoadingSequence());
@@ -42,25 +40,23 @@ public class LoadingManager : MonoBehaviour
 
     private void InitializeShuffledLists()
     {
-        // Create and shuffle the lists once
         shuffledImages = new List<Sprite>(backgroundImages);
         shuffledTips = new List<string>(loadingTips);
         ShuffleList(shuffledImages);
         ShuffleList(shuffledTips);
 
-        // Set the FIRST image and tip immediately (before any fade)
         if (shuffledImages.Count > 0)
         {
             backgroundImage.sprite = shuffledImages[0];
             backgroundImage.color = new Color(1, 1, 1, 1);
-            imageIndex = 1; // Start from second image in the cycle
+            imageIndex = 1;
         }
 
         if (shuffledTips.Count > 0)
         {
             tipText.text = shuffledTips[0];
             tipText.color = new Color(tipText.color.r, tipText.color.g, tipText.color.b, 1);
-            tipIndex = 1; // Start from second tip in the cycle
+            tipIndex = 1;
         }
     }
 
@@ -70,15 +66,12 @@ public class LoadingManager : MonoBehaviour
         loadingText.text = "Loading";
         botImage.transform.localRotation = Quaternion.identity;
 
-        // Start all animations immediately (don't wait)
         StartCoroutine(CycleBackgroundAndTip());
         StartCoroutine(AnimateBot());
         StartCoroutine(AnimateLoadingText());
 
-        // Fade in from black (runs concurrently with animations)
         StartCoroutine(Fade(1, 0, fadeDuration));
 
-        // Load next scene asynchronously
         yield return StartCoroutine(LoadNextScene());
     }
 
@@ -92,7 +85,6 @@ public class LoadingManager : MonoBehaviour
 
         yield return new WaitForSeconds(2f);
 
-        // Fade to black before transition
         yield return StartCoroutine(Fade(0, 1, fadeDuration));
         async.allowSceneActivation = true;
     }
@@ -113,13 +105,11 @@ public class LoadingManager : MonoBehaviour
         fadeOverlay.color = new Color(c.r, c.g, c.b, end);
     }
 
-    // 🖼️ & 💡 Synced image + tip change
     private IEnumerator CycleBackgroundAndTip()
     {
         if (backgroundImages.Count == 0)
             yield break;
 
-        // Wait for the initial display time before first transition
         yield return new WaitForSeconds(imageSwitchInterval);
 
         Image tempImage = new GameObject("TempImage").AddComponent<Image>();
@@ -135,7 +125,6 @@ public class LoadingManager : MonoBehaviour
 
         while (true)
         {
-            // Shuffle again when all have been shown
             if (imageIndex >= shuffledImages.Count)
             {
                 ShuffleList(shuffledImages);
@@ -150,7 +139,6 @@ public class LoadingManager : MonoBehaviour
             Sprite newSprite = shuffledImages[imageIndex++];
             string newTip = shuffledTips.Count > 0 ? shuffledTips[tipIndex++] : "";
 
-            // Prepare crossfade
             tempImage.sprite = backgroundImage.sprite;
             tempImage.color = new Color(1, 1, 1, 1);
             tempImage.gameObject.SetActive(true);
@@ -158,11 +146,9 @@ public class LoadingManager : MonoBehaviour
             backgroundImage.sprite = newSprite;
             backgroundImage.color = new Color(1, 1, 1, 0);
 
-            // Fade out tip
             yield return StartCoroutine(FadeTextAlpha(tipText, 1, 0, fadeDuration / 2));
             tipText.text = string.IsNullOrEmpty(newTip) ? "" : newTip;
 
-            // Crossfade images
             float t = 0f;
             while (t < fadeDuration)
             {
@@ -175,7 +161,6 @@ public class LoadingManager : MonoBehaviour
 
             tempImage.gameObject.SetActive(false);
 
-            // Fade tip back in
             yield return StartCoroutine(FadeTextAlpha(tipText, 0, 1, fadeDuration / 2));
 
             yield return new WaitForSeconds(imageSwitchInterval);
@@ -208,18 +193,16 @@ public class LoadingManager : MonoBehaviour
     private IEnumerator AnimateBot()
     {
         Vector3 startPos = botImage.rectTransform.anchoredPosition;
-        float floatAmplitude = 10f; // how high it moves up/down
-        float floatSpeed = 2f;      // how fast it moves
+        float floatAmplitude = 10f;
+        float floatSpeed = 2f;
         float animTime = 0f;
 
         while (true)
         {
             animTime += Time.deltaTime;
 
-            // 🌀 Rotate
             botImage.transform.Rotate(Vector3.forward, spinSpeed * Time.deltaTime);
 
-            // 🌊 Float (sin wave motion) - starts from a random point in the cycle
             float newY = startPos.y + Mathf.Sin(animTime * floatSpeed) * floatAmplitude;
             botImage.rectTransform.anchoredPosition = new Vector2(startPos.x, newY);
 

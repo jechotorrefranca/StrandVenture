@@ -15,7 +15,6 @@ public class GroqConfig
     public string api_key;
 }
 
-
 public class UserInfoSceneController : MonoBehaviour
 {
     private string apiKey;
@@ -59,16 +58,11 @@ public class UserInfoSceneController : MonoBehaviour
     public AudioClip errorClip;
     public AudioClip getReadyClip;
 
-
-
-
-
     void Start()
     {
         LoadGroqApiKey();
 
-        fadeOverlay.blocksRaycasts = true; // Default for fade-in
-
+        fadeOverlay.blocksRaycasts = true;
 
         var bgm = FindObjectOfType<BGMManager>();
         if (bgm != null)
@@ -96,7 +90,6 @@ public class UserInfoSceneController : MonoBehaviour
         saveButtonOriginalColor = saveButton.image.color;
 
         saveButton.onClick.AddListener(OnSaveButtonClicked);
-
     }
 
     private void LoadGroqApiKey()
@@ -187,7 +180,6 @@ public class UserInfoSceneController : MonoBehaviour
         saveButton.interactable = false;
 
         StartCoroutine(SaveSequenceAfterClick());
-
     }
 
     private IEnumerator GetGroqNickname(string fullName)
@@ -269,7 +261,7 @@ public class UserInfoSceneController : MonoBehaviour
 
             if (request.result != UnityWebRequest.Result.Success)
             {
-                Debug.LogError("❌ TTS Error: " + request.error);
+                Debug.LogError("TTS Error: " + request.error);
                 Debug.LogError("Response: " + request.downloadHandler.text);
                 onComplete?.Invoke(false);
                 yield break;
@@ -298,8 +290,6 @@ public class UserInfoSceneController : MonoBehaviour
             }
         }
     }
-
-
 
     private IEnumerator SaveSequenceAfterClick()
     {
@@ -344,17 +334,14 @@ public class UserInfoSceneController : MonoBehaviour
 
         botRT.anchoredPosition = endPos;
 
-        // 🔊 Goodbye message using TTS (with "Awwwesome name" inside)
         string nickname = PlayerPrefs.GetString("PlayerNickname", "friend");
         bool ttsSuccess = false;
 
-        // TTS will handle the whole line
         string ttsLine = $"(Excited) Awesome name, {nickname}!";
         yield return StartCoroutine(PlayGroqTTS(ttsLine, success => ttsSuccess = success));
 
         if (!ttsSuccess)
         {
-            // fallback audio if TTS failed
             if (errorClip != null)
             {
                 botAudio.clip = errorClip;
@@ -364,11 +351,9 @@ public class UserInfoSceneController : MonoBehaviour
         }
         else
         {
-            // optional short delay after TTS before next clip
             yield return new WaitForSeconds(0.3f);
         }
 
-        // Final "Get ready" clip for smoother closure
         if (getReadyClip != null)
         {
             botAudio.clip = getReadyClip;

@@ -29,7 +29,7 @@ public class BGMManager : MonoBehaviour
     public void FadeIn(float duration, float targetVolume = 1f)
     {
         if (!audioSource.isPlaying)
-            audioSource.Play(); // ensure it resumes
+            audioSource.Play();
 
         StartCoroutine(FadeAudio(duration, targetVolume));
     }
@@ -46,7 +46,7 @@ public class BGMManager : MonoBehaviour
             yield return null;
         }
         audioSource.volume = targetVolume;
-        if (targetVolume == 0f) audioSource.volume = 0f; // don’t stop, just stay silent
+        if (targetVolume == 0f) audioSource.volume = 0f;
 
     }
 }
