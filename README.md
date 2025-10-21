@@ -37,8 +37,7 @@ Each strand offers a unique, hands-on activity that reflects real-world applicat
 | **TitleScene** | Opening screen with start/agree buttons and transitions. |
 | **UserInfoScene** | Collects player name and section, with AI nickname generation. |
 | **ExamScene** | Interactive quiz determining strand affinity. |
-| **ABMScene** | Financial categorization mini-game. |
-| **HUMSSScene** | Moral choice-based ethics simulation. |
+| **StrandScene** | Visualize your SHS Strand experience. |
 | **JobExpoScene** | Mock interview activity with AI feedback. |
 | **ResultScenes** | Displays strand-based performance summaries. |
 
