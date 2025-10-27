@@ -128,7 +128,7 @@ public class AptitudeBotController : MonoBehaviour
         overlayImage.color = color;
 
         Debug.Log("Exam Finished — loading result scene...");
-        SceneManager.LoadScene(nextSceneName);
+        SceneLoader.LoadSceneWithLoading(nextSceneName);
     }
 
     // --- BOT ANIMATIONS ---

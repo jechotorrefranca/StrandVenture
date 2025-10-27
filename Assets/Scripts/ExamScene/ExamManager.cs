@@ -186,7 +186,7 @@ public class ExamManager : MonoBehaviour
         {
             float strandScore = ((float)strandScores[strand] / (float)strandQuestionCounts[strand]) * 100f;
             float avgStrandTime = strandTotalTimes[strand] / (float)strandQuestionCounts[strand];
-
+            PlayerPrefs.SetFloat($"{strand}_Score", strandScore);
             PlayerPrefs.SetString($"{strand}_Stats", $"Score={strandScore:F1}%, AvgTime={avgStrandTime:F2}s, Questions={strandQuestionCounts[strand]}");
 
             Debug.Log($"{strand}: Score={strandScore:F1}%, AvgTime={avgStrandTime:F2}s, Questions={strandQuestionCounts[strand]}");
