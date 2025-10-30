@@ -559,7 +559,7 @@ public class ExamResultSceneController : MonoBehaviour
     {
         string url = "https://api.groq.com/openai/v1/chat/completions";
 
-        string prompt = $"Summarize this educational insight into a short, natural-sounding speech (2-3 sentences max) that can be spoken aloud:\n\n{fullInsights}";
+        string prompt = $"Summarize this educational insight into a short, natural-sounding speech (2 sentences max) that can be spoken aloud:\n\n{fullInsights}";
 
         ChatRequest chatRequest = new ChatRequest
         {
