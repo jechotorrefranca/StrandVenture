@@ -1,16 +1,20 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using System.IO;
 using UnityEngine.Video;
 using UnityEngine.SceneManagement;
+using UnityEngine.Networking;
 using System.Collections;
+using System.Collections.Generic;
+using System.Text;
 
 [System.Serializable]
 public class PieSlice
 {
     public string strandName;
     public Image sliceImage;
-    public TMP_Text percentageText; // optional
+    public TMP_Text percentageText;
     [HideInInspector] public float targetFill;
 }
 
@@ -26,21 +30,23 @@ public class ExamResultSceneController : MonoBehaviour
     public Sprite idleSprite;
     public Sprite talkingSprite;
     public AudioSource botAudio;
-    public AudioClip introAudioClip; // Audio for initial scene start
-    public AudioClip insightsAudioClip; // Audio for AI insights button
+    public AudioClip introAudioClip;
+    public AudioClip ttsErrorFallbackClip;
+    private string apiKey;
 
     [Header("Bot Button (Insights)")]
-    public GameObject botButton; // Empty object with image and text that floats
-    public GameObject insightsPanel; // GameObject that appears when insights button is clicked
+    public GameObject botButton;
+    public GameObject insightsPanel;
+    public TMP_Text insightsContentText;
     public float buttonFloatAmplitude = 10f;
     public float buttonFloatSpeed = 1.5f;
-    public float insightsPanelDelay = 1f; // Delay before bot speaks after panel appears
+    public float insightsPanelDelay = 1f;
 
     [Header("Bot Animation Settings")]
     public float botEntranceDuration = 0.5f;
     public float botOutroDuration = 0.5f;
-    public float botEntranceRotation = 360f; // Full rotation during entrance
-    public float volumeThreshold = 0.02f; // Audio threshold for talking detection
+    public float botEntranceRotation = 360f;
+    public float volumeThreshold = 0.02f;
     public AnimationCurve botScaleCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
 
     [Header("Insights Panel Animation Settings")]
@@ -65,31 +71,34 @@ public class ExamResultSceneController : MonoBehaviour
     private bool isClosingPanel = false;
     private Coroutine currentBotSequence;
 
+    private string cachedInsightsText = "";
+    private string cachedSummaryText = "";
+    private AudioClip cachedTTSClip = null;
+    private bool isInsightsLoaded = false;
+    private bool isInsightsLoading = false;
+
     void Start()
     {
-        // Fade in overlay
+        LoadGroqApiKey();
+
         fadeOverlay.alpha = 1f;
         fadeOverlay.blocksRaycasts = true;
         StartCoroutine(FadeCanvas(fadeOverlay, 1f, 0f, 1f));
 
-        // Start video background
         if (backgroundVideo != null) backgroundVideo.Play();
 
-        // Store bot final position and set initial scale to 0
         RectTransform botRect = botContainer.GetComponent<RectTransform>();
         botFinalPos = botRect.anchoredPosition;
         botRect.localScale = Vector3.zero;
         botContainer.SetActive(true);
         botImage.sprite = idleSprite;
 
-        // Hide insights panel initially and set scale to 0
         if (insightsPanel != null)
         {
             insightsPanel.SetActive(false);
             insightsPanel.GetComponent<RectTransform>().localScale = Vector3.zero;
         }
 
-        // Store button position and start floating
         buttonOriginalPos = botButton.GetComponent<RectTransform>().anchoredPosition;
         Button btnComponent = botButton.GetComponent<Button>();
         if (btnComponent == null)
@@ -99,21 +108,99 @@ public class ExamResultSceneController : MonoBehaviour
         btnComponent.onClick.AddListener(OnBotButtonClicked);
         buttonFloatCoroutine = StartCoroutine(ButtonFloatingMotion());
 
-        // Display best strand
         string bestStrand = PlayerPrefs.GetString("BestStrand", "Unknown");
         float bestScore = PlayerPrefs.GetFloat("BestScore", 0f);
         bestStrandText.text = $"Your best strand is: {bestStrand} ({bestScore:F1}%)";
 
-        // Initialize and animate pie graph
         LoadPieGraphData();
         StartCoroutine(AnimatePieSlices());
 
-        // Continue button
         continueButton.onClick.AddListener(OnContinueClicked);
 
-        // Start intro sequence: entrance -> talk -> outro
         StartCoroutine(BotIntroSequence());
+
+        StartCoroutine(PreloadAIInsights());
     }
+
+    private void LoadGroqApiKey()
+    {
+        string path;
+
+#if UNITY_EDITOR
+        path = Path.Combine(Application.dataPath, "../groq_config.json");
+#else
+        path = Path.Combine(Application.streamingAssetsPath, "groq_config.json");
+#endif
+
+        Debug.Log("Looking for config at: " + path);
+
+        if (File.Exists(path))
+        {
+            string json = File.ReadAllText(path);
+            GroqConfig config = JsonUtility.FromJson<GroqConfig>(json);
+            apiKey = config.api_key;
+            Debug.Log("API Key loaded successfully!");
+        }
+        else
+        {
+            Debug.LogError("groq_config.json not found at: " + path);
+            Debug.LogError("Current Application.dataPath: " + Application.dataPath);
+            Debug.LogError("Current Application.streamingAssetsPath: " + Application.streamingAssetsPath);
+        }
+    }
+
+    #region AI Preloading
+
+    private IEnumerator PreloadAIInsights()
+    {
+        if (isInsightsLoaded || isInsightsLoading) yield break;
+
+        isInsightsLoading = true;
+        Debug.Log("🔄 Preloading AI insights in background...");
+
+        yield return new WaitForSeconds(2f);
+
+        yield return StartCoroutine(GenerateGroqInsights());
+
+        if (string.IsNullOrEmpty(cachedInsightsText))
+        {
+            Debug.LogWarning("⚠️ Failed to preload insights");
+            isInsightsLoading = false;
+            yield break;
+        }
+
+        bool summaryComplete = false;
+        yield return StartCoroutine(SummarizeInsightsForTTS(cachedInsightsText, summary =>
+        {
+            cachedSummaryText = summary;
+            summaryComplete = true;
+        }));
+
+        if (!summaryComplete || string.IsNullOrEmpty(cachedSummaryText))
+        {
+            Debug.LogWarning("⚠️ Failed to preload summary");
+            cachedSummaryText = cachedInsightsText;
+        }
+
+        bool ttsComplete = false;
+        yield return StartCoroutine(GenerateTTSClip(cachedSummaryText, clip =>
+        {
+            cachedTTSClip = clip;
+            ttsComplete = true;
+        }));
+
+        if (!ttsComplete || cachedTTSClip == null)
+        {
+            Debug.LogWarning("⚠️ Failed to preload TTS audio - will use fallback sound");
+            cachedTTSClip = ttsErrorFallbackClip;
+        }
+
+        isInsightsLoaded = true;
+        isInsightsLoading = false;
+        Debug.Log("✅ AI insights preloaded successfully!");
+    }
+
+    #endregion
 
     #region Bot Animation Sequences
 
@@ -121,17 +208,13 @@ public class ExamResultSceneController : MonoBehaviour
     {
         isBotAnimating = true;
 
-        // Entrance animation
         yield return StartCoroutine(BotEntranceAnimation());
 
-        // Get intro speech
         string bestStrand = PlayerPrefs.GetString("BestStrand", "Unknown");
         string introText = $"Welcome! Your results are in. Your best fit is {bestStrand}. Let me explain your scores!";
 
-        // Talk animation
         yield return StartCoroutine(PlayBotSpeech(introAudioClip));
 
-        // Outro animation
         yield return StartCoroutine(BotOutroAnimation());
 
         isBotAnimating = false;
@@ -139,61 +222,85 @@ public class ExamResultSceneController : MonoBehaviour
 
     private IEnumerator BotInsightsSequence()
     {
-        // Force immediate outro if bot is currently visible
         if (isBotAnimating)
         {
-            // Immediately hide the bot without animation
             RectTransform rt = botContainer.GetComponent<RectTransform>();
             rt.localScale = Vector3.zero;
             rt.anchoredPosition = botFinalPos;
 
-            // Stop audio
             if (botAudio != null && botAudio.isPlaying)
             {
                 botAudio.Stop();
             }
 
-            // Reset sprite
             botImage.sprite = idleSprite;
         }
 
         isBotAnimating = true;
         isClosingPanel = false;
 
-        // Show insights panel with entrance animation
         if (insightsPanel != null)
         {
             insightsPanel.SetActive(true);
+
+            if (isInsightsLoading)
+            {
+                insightsContentText.text = "Analyzing your results...";
+            }
+            else if (isInsightsLoaded)
+            {
+                insightsContentText.text = cachedInsightsText;
+            }
+            else
+            {
+                insightsContentText.text = "Loading insights...";
+            }
+
             yield return StartCoroutine(PanelEntranceAnimation());
         }
 
-        // Check if closing was requested during panel entrance
         if (isClosingPanel) yield break;
 
-        // Wait for specified delay before bot appears and speaks
+        while (isInsightsLoading)
+        {
+            yield return new WaitForSeconds(0.1f);
+            if (isClosingPanel) yield break;
+        }
+
+        if (!isInsightsLoaded)
+        {
+            Debug.Log("⚠️ Insights not preloaded, loading now...");
+            yield return StartCoroutine(PreloadAIInsights());
+        }
+
+        if (insightsPanel != null && !string.IsNullOrEmpty(cachedInsightsText))
+        {
+            insightsContentText.text = cachedInsightsText;
+        }
+
+        if (isClosingPanel) yield break;
+
         yield return new WaitForSeconds(insightsPanelDelay);
 
-        // Check if closing was requested during delay
         if (isClosingPanel) yield break;
 
-        // Entrance animation
         yield return StartCoroutine(BotEntranceAnimation());
 
-        // Check if closing was requested during bot entrance
         if (isClosingPanel) yield break;
 
-        // Get insights
-        string bestStrand = PlayerPrefs.GetString("BestStrand", "Unknown");
-        string stats = PlayerPrefs.GetString($"{bestStrand}_Stats", "No detailed data available for this strand.");
+        if (cachedTTSClip != null)
+        {
+            botAudio.clip = cachedTTSClip;
+            botAudio.Play();
+            yield return StartCoroutine(BotTalkAnimationWithAudio());
+        }
+        else
+        {
+            Debug.LogWarning("⚠️ No TTS clip or fallback available, using animation only");
+            yield return StartCoroutine(BotTalkAnimation(3f));
+        }
 
-        // Talk animation
-        yield return StartCoroutine(PlayBotSpeech(insightsAudioClip));
-
-        // Check if closing was requested during speech
         if (isClosingPanel) yield break;
-
-        // Outro animation
-        yield return StartCoroutine(BotOutroAnimation());
 
         isBotAnimating = false;
     }
@@ -209,10 +316,7 @@ public class ExamResultSceneController : MonoBehaviour
             float t = Mathf.Clamp01(elapsed / botEntranceDuration);
             float curveValue = botScaleCurve.Evaluate(t);
 
-            // Scale from 0 to 1
             rt.localScale = Vector3.one * curveValue;
-
-            // Rotate during entrance
             float rotation = Mathf.Lerp(botEntranceRotation, 0f, curveValue);
             rt.localEulerAngles = new Vector3(0, 0, rotation);
 
@@ -234,10 +338,7 @@ public class ExamResultSceneController : MonoBehaviour
             float t = Mathf.Clamp01(elapsed / botOutroDuration);
             float curveValue = botScaleCurve.Evaluate(t);
 
-            // Scale from 1 to 0
             rt.localScale = Vector3.one * (1f - curveValue);
-
-            // Rotate during outro
             float rotation = Mathf.Lerp(0f, botEntranceRotation, curveValue);
             rt.localEulerAngles = new Vector3(0, 0, rotation);
 
@@ -264,9 +365,7 @@ public class ExamResultSceneController : MonoBehaviour
             float t = Mathf.Clamp01(elapsed / panelEntranceDuration);
             float curveValue = panelScaleCurve.Evaluate(t);
 
-            // Scale from 0 to 1
             rt.localScale = Vector3.one * curveValue;
-
             yield return null;
         }
 
@@ -286,9 +385,7 @@ public class ExamResultSceneController : MonoBehaviour
             float t = Mathf.Clamp01(elapsed / panelOutroDuration);
             float curveValue = panelScaleCurve.Evaluate(t);
 
-            // Scale from 1 to 0
             rt.localScale = Vector3.one * (1f - curveValue);
-
             yield return null;
         }
 
@@ -305,14 +402,12 @@ public class ExamResultSceneController : MonoBehaviour
     {
         float totalScore = 0f;
 
-        // First pass: calculate total score
         foreach (var slice in pieSlices)
         {
             float score = PlayerPrefs.GetFloat($"{slice.strandName}_Score", 0f);
             totalScore += score;
         }
 
-        // Second pass: set up slices with proper fill amounts and rotations
         float currentFillOffset = 0f;
 
         foreach (var slice in pieSlices)
@@ -320,13 +415,11 @@ public class ExamResultSceneController : MonoBehaviour
             float score = PlayerPrefs.GetFloat($"{slice.strandName}_Score", 0f);
             Debug.Log($"{slice.strandName}_Score: {score}");
 
-            // Calculate this slice's portion of the whole pie
             float fillAmount = totalScore > 0 ? (score / totalScore) : 0f;
             slice.targetFill = fillAmount;
             slice.sliceImage.fillAmount = 0f;
 
-            // Set the fill origin rotation so this slice starts where the last one ended
-            slice.sliceImage.fillOrigin = 2; // Top origin
+            slice.sliceImage.fillOrigin = 2;
             RectTransform rt = slice.sliceImage.GetComponent<RectTransform>();
             rt.localEulerAngles = new Vector3(0, 0, -currentFillOffset * 360f);
 
@@ -339,7 +432,6 @@ public class ExamResultSceneController : MonoBehaviour
 
     IEnumerator AnimatePieSlices()
     {
-        // Animate each slice one by one, sequentially
         for (int i = 0; i < pieSlices.Length; i++)
         {
             PieSlice slice = pieSlices[i];
@@ -351,25 +443,23 @@ public class ExamResultSceneController : MonoBehaviour
                 float t = Mathf.Clamp01(elapsed / fillDuration);
                 float curveValue = fillCurve.Evaluate(t);
 
-                // Animate only this slice
                 float newFill = Mathf.Lerp(0f, slice.targetFill, curveValue);
                 slice.sliceImage.fillAmount = newFill;
 
                 if (slice.percentageText != null)
                 {
                     float actualPercentage = newFill * 100f;
-                    slice.percentageText.text = Mathf.RoundToInt(actualPercentage) + "%";
+                    slice.percentageText.text = $"{slice.strandName}: {Mathf.RoundToInt(actualPercentage)}%";
                 }
 
                 yield return null;
             }
 
-            // Ensure final value is set before moving to next slice
             slice.sliceImage.fillAmount = slice.targetFill;
             if (slice.percentageText != null)
             {
                 float actualPercentage = slice.targetFill * 100f;
-                slice.percentageText.text = Mathf.RoundToInt(actualPercentage) + "%";
+                slice.percentageText.text = $"{slice.strandName}: {Mathf.RoundToInt(actualPercentage)}%";
             }
         }
     }
@@ -383,17 +473,213 @@ public class ExamResultSceneController : MonoBehaviour
 
     #endregion
 
+    #region Groq AI Methods
+
+    private IEnumerator GenerateGroqInsights()
+    {
+        string url = "https://api.groq.com/openai/v1/chat/completions";
+
+        string resultsData = "Student Results:\n";
+
+        foreach (var slice in pieSlices)
+        {
+            string strand = slice.strandName;
+            string strandStats = PlayerPrefs.GetString($"{strand}_Stats", "No data available.");
+            resultsData += $"- {strand}: {strandStats}\n";
+            Debug.Log($"Strand {strand} stats: {strandStats}");
+        }
+
+        string bestStrand = PlayerPrefs.GetString("BestStrand", "Unknown");
+        resultsData += $"\nHighest Score: {bestStrand}";
+
+        string prompt = $"{resultsData}\n\nBased on these results, give your AI opinion on which track the student is best suited for and explain why in simple sentences and terms.";
+
+        ChatRequest chatRequest = new ChatRequest
+        {
+            model = "openai/gpt-oss-120b",
+            messages = new List<Message>
+            {
+                new Message { role = "system", content = "You are an educational counselor AI that provides clear, encouraging insights about student aptitudes. Keep responses concise and supportive. Do not use emojis." },
+                new Message { role = "user", content = prompt }
+            }
+        };
+
+        string requestBody = JsonUtility.ToJson(chatRequest);
+        byte[] bodyRaw = Encoding.UTF8.GetBytes(requestBody);
+
+        using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
+        {
+            request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+            request.downloadHandler = new DownloadHandlerBuffer();
+            request.SetRequestHeader("Content-Type", "application/json");
+            request.SetRequestHeader("Authorization", "Bearer " + apiKey);
+
+            yield return request.SendWebRequest();
+
+            if (request.result != UnityWebRequest.Result.Success)
+            {
+                Debug.LogError("Groq API Error: " + request.error);
+                cachedInsightsText = "I'm having trouble analyzing your results right now. Please try again later.";
+            }
+            else
+            {
+                Debug.Log("Groq Insights Raw Response: " + request.downloadHandler.text);
+
+                ChatResponse response = JsonUtility.FromJson<ChatResponse>(request.downloadHandler.text);
+                if (response != null && response.choices.Length > 0)
+                {
+                    cachedInsightsText = CleanAIText(response.choices[0].message.content);
+                    Debug.Log("Generated Insights: " + cachedInsightsText);
+                }
+            }
+        }
+    }
+
+    private string CleanAIText(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return text;
+
+        text = text.Replace("**", "");
+
+        text = text.Replace("__", "");
+
+        text = text.Replace("*", "");
+
+        text = System.Text.RegularExpressions.Regex.Replace(text, @"(?<=\s)_|_(?=\s)|^_|_$", "");
+
+        text = text.Replace("###", "");
+        text = text.Replace("##", "");
+        text = text.Replace("#", "");
+
+        return text.Trim();
+    }
+
+    private IEnumerator SummarizeInsightsForTTS(string fullInsights, System.Action<string> onComplete)
+    {
+        string url = "https://api.groq.com/openai/v1/chat/completions";
+
+        string prompt = $"Summarize this educational insight into a short, natural-sounding speech (2-3 sentences max) that can be spoken aloud:\n\n{fullInsights}";
+
+        ChatRequest chatRequest = new ChatRequest
+        {
+            model = "openai/gpt-oss-120b",
+            messages = new List<Message>
+            {
+                new Message { role = "system", content = "You are a text summarizer. Create brief, conversational summaries perfect for text-to-speech. Keep it friendly and concise." },
+                new Message { role = "user", content = prompt }
+            }
+        };
+
+        string requestBody = JsonUtility.ToJson(chatRequest);
+        byte[] bodyRaw = Encoding.UTF8.GetBytes(requestBody);
+
+        using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
+        {
+            request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+            request.downloadHandler = new DownloadHandlerBuffer();
+            request.SetRequestHeader("Content-Type", "application/json");
+            request.SetRequestHeader("Authorization", "Bearer " + apiKey);
+
+            yield return request.SendWebRequest();
+
+            if (request.result != UnityWebRequest.Result.Success)
+            {
+                Debug.LogError("Groq Summarization Error: " + request.error);
+                string[] sentences = fullInsights.Split('.');
+                string fallbackSummary = sentences.Length > 2
+                    ? $"{sentences[0]}. {sentences[1]}."
+                    : fullInsights;
+                onComplete?.Invoke(fallbackSummary);
+            }
+            else
+            {
+                Debug.Log("Groq Summary Raw Response: " + request.downloadHandler.text);
+
+                ChatResponse response = JsonUtility.FromJson<ChatResponse>(request.downloadHandler.text);
+                if (response != null && response.choices.Length > 0)
+                {
+                    string summary = response.choices[0].message.content.Trim();
+                    Debug.Log("Summarized for TTS: " + summary);
+                    onComplete?.Invoke(summary);
+                }
+                else
+                {
+                    onComplete?.Invoke(fullInsights);
+                }
+            }
+        }
+    }
+    private IEnumerator GenerateTTSClip(string text, System.Action<AudioClip> onComplete)
+    {
+        string url = "https://api.groq.com/openai/v1/audio/speech";
+
+        SpeechRequest payload = new SpeechRequest
+        {
+            model = "playai-tts",
+            voice = "Chip-PlayAI",
+            input = text,
+            response_format = "wav"
+        };
+
+        string json = JsonUtility.ToJson(payload);
+        Debug.Log("➡️ Sending TTS JSON: " + json);
+
+        using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
+        {
+            byte[] bodyRaw = Encoding.UTF8.GetBytes(json);
+            request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+            request.downloadHandler = new DownloadHandlerBuffer();
+
+            request.SetRequestHeader("Authorization", "Bearer " + apiKey);
+            request.SetRequestHeader("Content-Type", "application/json");
+            request.SetRequestHeader("Accept", "audio/wav");
+
+            yield return request.SendWebRequest();
+
+            if (request.result != UnityWebRequest.Result.Success)
+            {
+                Debug.LogError("❌ TTS Error: " + request.error);
+                Debug.LogError("Response: " + request.downloadHandler.text);
+                Debug.Log("🔊 Will use fallback error sound if available");
+                onComplete?.Invoke(null);
+                yield break;
+            }
+
+            byte[] audioData = request.downloadHandler.data;
+            if (audioData == null || audioData.Length == 0)
+            {
+                Debug.LogError("⚠️ Empty audio response from TTS");
+                Debug.Log("🔊 Will use fallback error sound if available");
+                onComplete?.Invoke(null);
+                yield break;
+            }
+
+            AudioClip clip = WavUtility.ToAudioClip(audioData, 0, "GroqTTSClip");
+            if (clip != null)
+            {
+                Debug.Log("✅ TTS clip generated successfully");
+                onComplete?.Invoke(clip);
+            }
+            else
+            {
+                Debug.LogError("❌ Failed to decode TTS audio clip");
+                Debug.Log("🔊 Will use fallback error sound if available");
+                onComplete?.Invoke(null);
+            }
+        }
+    }
+
+    #endregion
+
     #region Bot Methods
 
     private void OnBotButtonClicked()
     {
-        // Don't allow clicks while panel is animating
         if (isPanelAnimating) return;
 
-        // Toggle insights panel
         if (insightsPanel != null && insightsPanel.activeSelf)
         {
-            // Signal that we're closing and stop the current sequence
             isClosingPanel = true;
             if (currentBotSequence != null)
             {
@@ -401,12 +687,10 @@ public class ExamResultSceneController : MonoBehaviour
                 currentBotSequence = null;
             }
 
-            // Close panel with animation and force bot outro
             StartCoroutine(CloseInsightsPanelSequence());
         }
         else
         {
-            // Start insights sequence (entrance -> talk -> outro)
             if (currentBotSequence != null)
             {
                 StopCoroutine(currentBotSequence);
@@ -417,36 +701,29 @@ public class ExamResultSceneController : MonoBehaviour
 
     private IEnumerator CloseInsightsPanelSequence()
     {
-        // If bot is talking or animating, force immediate outro
-        if (isBotAnimating)
+        if (isBotAnimating || botContainer.GetComponent<RectTransform>().localScale != Vector3.zero)
         {
-            // Stop audio immediately
             if (botAudio != null && botAudio.isPlaying)
             {
                 botAudio.Stop();
             }
 
-            // Reset sprite and position
             botImage.sprite = idleSprite;
             RectTransform botRect = botContainer.GetComponent<RectTransform>();
             botRect.anchoredPosition = botFinalPos;
 
-            // Play bot outro animation
             yield return StartCoroutine(BotOutroAnimation());
 
             isBotAnimating = false;
         }
 
-        // Play panel outro animation
         yield return StartCoroutine(PanelOutroAnimation());
 
-        // Reset closing flag
         isClosingPanel = false;
     }
 
     private IEnumerator PlayBotSpeech(AudioClip audioClip)
     {
-        // Play audio if available
         if (botAudio != null && audioClip != null)
         {
             botAudio.clip = audioClip;
@@ -457,7 +734,6 @@ public class ExamResultSceneController : MonoBehaviour
         else
         {
             Debug.LogWarning("No audio clip assigned or AudioSource missing!");
-            // Fallback: default duration if no audio
             float duration = 2f;
             yield return StartCoroutine(BotTalkAnimation(duration));
         }
@@ -470,10 +746,8 @@ public class ExamResultSceneController : MonoBehaviour
 
         while (botAudio.isPlaying)
         {
-            // Get audio spectrum data
             botAudio.GetOutputData(samples, 0);
 
-            // Calculate average volume
             float averageVolume = 0f;
             for (int i = 0; i < samples.Length; i++)
             {
@@ -481,7 +755,6 @@ public class ExamResultSceneController : MonoBehaviour
             }
             averageVolume /= samples.Length;
 
-            // Switch sprite based on volume threshold
             if (averageVolume > volumeThreshold)
             {
                 botImage.sprite = talkingSprite;
@@ -491,7 +764,6 @@ public class ExamResultSceneController : MonoBehaviour
                 botImage.sprite = idleSprite;
             }
 
-            // Add slight vertical movement while talking
             float time = Time.time;
             float offsetY = Mathf.Sin(time * 3f) * 5f;
             rt.anchoredPosition = botFinalPos + new Vector2(0, offsetY);
@@ -499,7 +771,6 @@ public class ExamResultSceneController : MonoBehaviour
             yield return null;
         }
 
-        // Return to idle state
         botImage.sprite = idleSprite;
         rt.anchoredPosition = botFinalPos;
     }
@@ -511,10 +782,8 @@ public class ExamResultSceneController : MonoBehaviour
 
         while (time < duration)
         {
-            // Swap between idle and talking sprites (fallback when no audio)
             botImage.sprite = (Mathf.Sin(time * 20f) > 0) ? talkingSprite : idleSprite;
 
-            // Add slight vertical movement while talking
             float offsetY = Mathf.Sin(time * 3f) * 5f;
             rt.anchoredPosition = botFinalPos + new Vector2(0, offsetY);
 
@@ -522,7 +791,6 @@ public class ExamResultSceneController : MonoBehaviour
             yield return null;
         }
 
-        // Return to idle state
         botImage.sprite = idleSprite;
         rt.anchoredPosition = botFinalPos;
     }
@@ -571,6 +839,45 @@ public class ExamResultSceneController : MonoBehaviour
 
         if (group.alpha <= 0.01f)
             group.blocksRaycasts = false;
+    }
+
+    #endregion
+
+    #region JSON Serialization Classes
+
+    [System.Serializable]
+    public class Message
+    {
+        public string role;
+        public string content;
+    }
+
+    [System.Serializable]
+    public class Choice
+    {
+        public Message message;
+    }
+
+    [System.Serializable]
+    public class ChatResponse
+    {
+        public Choice[] choices;
+    }
+
+    [System.Serializable]
+    public class ChatRequest
+    {
+        public string model;
+        public List<Message> messages;
+    }
+
+    [System.Serializable]
+    public class SpeechRequest
+    {
+        public string model;
+        public string voice;
+        public string input;
+        public string response_format;
     }
 
     #endregion
