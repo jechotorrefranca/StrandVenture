@@ -331,11 +331,40 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 0e57d37edb15d8448a334412f4f8aa1d, type: 3}
   - {fileID: 21300000, guid: 437ade22e4786044e8d3045905409fa5, type: 3}
   loadingTips:
-  - John Neil Tamondong is the Leader for StrandVenture
-  - Adrian Belo is a Prompt Enginner
-  - Jocas Arabella Cruz is still finding a way to contact Sir Therrence
-  - AmBot is the original name for our Bot!
-  - Jecho Torrefranca wants to die
+  - "DYCIans in ABM turn ideas into thriving enterprises showcasing skills, we don\u2019t
+    just study business, we build it."
+  - HUMSS students use their voices to inspire and influence, becoming writers, and
+    speakers known nationwide.
+  - In STEM, DYCIans innovate beyond experiments, creating robots and breakthroughs
+    that win in national and international arenas.
+  - ICT students turn creativity into code build real-world apps and systems, proving
+    digital excellence starts here.
+  - In Maritime, DYCIans train through hands-on experiences, preparing to lead the
+    seas with real certifications and skills.
+  - DYCIans in ABM create ventures, seize opportunities, and bring ideas to life.
+  - In ABM, DYCIans turn ambition into achievement creating, leading, and shaping
+    the future of business.
+  - DYCIans in ABM turn vision into impact, leading with purpose and achieving excellence.
+  - DYCIans in HUMSS lead with purpose their words inspire, their actions empower,
+    their ideas transform.
+  - With bold voices and fearless ideas, DYCIans in HUMSS inspire minds and move
+    hearts.
+  - DYCIans in HUMSS inspire and influence, emerging as writers and speakers who
+    shape the nation.
+  - DYCIans in STEM push knowledge forward, exploring and innovating beyond limits.
+  - Curiosity drives every DYCIans in STEM to turn challenges into discoveries.
+  - DYCIans in STEM innovate beyond labs, creating award-winning robots and breakthroughs.
+  - DYCIans in ICT fuse creativity and tech to design solutions that connect and
+    advance society.
+  - Skilled and creative, DYCIans in ICT design, code, and build innovations that
+    matter.
+  - DYCIans in ICT turn creativity into code, building apps and systems that define
+    digital excellence.
+  - DYCIans in Maritime gain the confidence to navigate challenges and command with
+    strength.
+  - On land or at sea, DYCIans in Maritime lead with discipline and skill.
+  - DYCIans in Maritime train hands-on, earning real skills and certifications to
+    lead confidently at sea.
   imageSwitchInterval: 4
   fadeDuration: 1
   spinSpeed: 50
