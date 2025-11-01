@@ -8,6 +8,8 @@ using UnityEngine.Networking;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
+using System.Diagnostics;
+using Debug = UnityEngine.Debug;
 
 [System.Serializable]
 public class PieSlice
@@ -33,6 +35,13 @@ public class ExamResultSceneController : MonoBehaviour
     public AudioClip introAudioClip;
     public AudioClip ttsErrorFallbackClip;
     private string apiKey;
+
+    [Header("Piper TTS Settings")]
+    public string piperVoiceName = "en_US-hfc_male-medium";
+    [Range(0f, 1f)]
+    public float piperVolume = 0.5f; // Adjustable volume for Piper TTS
+    private string piperPath;
+    private string voicesDir;
 
     [Header("Bot Button (Insights)")]
     public GameObject botButton;
@@ -80,6 +89,7 @@ public class ExamResultSceneController : MonoBehaviour
     void Start()
     {
         LoadGroqApiKey();
+        InitializePiper();
 
         fadeOverlay.alpha = 1f;
         fadeOverlay.blocksRaycasts = true;
@@ -120,6 +130,27 @@ public class ExamResultSceneController : MonoBehaviour
         StartCoroutine(BotIntroSequence());
 
         StartCoroutine(PreloadAIInsights());
+    }
+
+    private void InitializePiper()
+    {
+        piperPath = Path.Combine(Application.streamingAssetsPath, "piper/piper.exe");
+        voicesDir = Path.Combine(Application.streamingAssetsPath, "piper/voices");
+
+        if (!File.Exists(piperPath))
+        {
+            Debug.LogError($"❌ Piper executable not found at: {piperPath}");
+        }
+
+        string modelPath = Path.Combine(voicesDir, piperVoiceName + ".onnx");
+        if (!File.Exists(modelPath))
+        {
+            Debug.LogError($"❌ Piper voice model not found: {piperVoiceName}");
+        }
+        else
+        {
+            Debug.Log($"✅ Piper TTS initialized with voice: {piperVoiceName}");
+        }
     }
 
     private void LoadGroqApiKey()
@@ -183,7 +214,7 @@ public class ExamResultSceneController : MonoBehaviour
         }
 
         bool ttsComplete = false;
-        yield return StartCoroutine(GenerateTTSClip(cachedSummaryText, clip =>
+        yield return StartCoroutine(GeneratePiperTTS(cachedSummaryText, clip =>
         {
             cachedTTSClip = clip;
             ttsComplete = true;
@@ -499,7 +530,7 @@ public class ExamResultSceneController : MonoBehaviour
             model = "openai/gpt-oss-120b",
             messages = new List<Message>
             {
-                new Message { role = "system", content = "You are an educational counselor AI that provides clear, encouraging insights about student aptitudes. Keep responses concise and supportive. Do not use emojis." },
+                new Message { role = "system", content = "You are an educational counselor AI that provides clear, detailed, and encouraging insights about student aptitudes. Keep responses concise and supportive. Do not use emojis." },
                 new Message { role = "user", content = prompt }
             }
         };
@@ -541,13 +572,9 @@ public class ExamResultSceneController : MonoBehaviour
             return text;
 
         text = text.Replace("**", "");
-
         text = text.Replace("__", "");
-
         text = text.Replace("*", "");
-
         text = System.Text.RegularExpressions.Regex.Replace(text, @"(?<=\s)_|_(?=\s)|^_|_$", "");
-
         text = text.Replace("###", "");
         text = text.Replace("##", "");
         text = text.Replace("#", "");
@@ -559,7 +586,7 @@ public class ExamResultSceneController : MonoBehaviour
     {
         string url = "https://api.groq.com/openai/v1/chat/completions";
 
-        string prompt = $"Summarize this educational insight into a short, natural-sounding speech (2 sentences max) that can be spoken aloud:\n\n{fullInsights}";
+        string prompt = $"Summarize this educational insight into a short, natural-sounding speech (3-4 sentences max) that can be spoken aloud:\n\n{fullInsights}";
 
         ChatRequest chatRequest = new ChatRequest
         {
@@ -610,64 +637,165 @@ public class ExamResultSceneController : MonoBehaviour
             }
         }
     }
-    private IEnumerator GenerateTTSClip(string text, System.Action<AudioClip> onComplete)
-    {
-        string url = "https://api.groq.com/openai/v1/audio/speech";
 
-        SpeechRequest payload = new SpeechRequest
+    #endregion
+
+    #region Piper TTS Methods
+
+    private IEnumerator GeneratePiperTTS(string text, System.Action<AudioClip> onComplete)
+    {
+        string outputPath = Path.Combine(Application.persistentDataPath, "piper_output.wav");
+        string modelPath = Path.Combine(voicesDir, piperVoiceName + ".onnx");
+
+        if (!File.Exists(modelPath))
         {
-            model = "playai-tts",
-            voice = "Chip-PlayAI",
-            input = text,
-            response_format = "wav"
+            Debug.LogError($"❌ Piper voice not found: {piperVoiceName}");
+            onComplete?.Invoke(null);
+            yield break;
+        }
+
+        // Delete old file if exists (outside yield context)
+        if (File.Exists(outputPath))
+        {
+            try
+            {
+                File.Delete(outputPath);
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"⚠️ Could not delete old WAV file: {e.Message}");
+            }
+        }
+
+        var psi = new ProcessStartInfo
+        {
+            FileName = piperPath,
+            Arguments = $"--model \"{modelPath}\" --output_file \"{outputPath}\" --output_format wav",
+            RedirectStandardInput = true,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            WorkingDirectory = Path.GetDirectoryName(piperPath)
         };
 
-        string json = JsonUtility.ToJson(payload);
-        Debug.Log("➡️ Sending TTS JSON: " + json);
+        Process process = null;
+        bool processStarted = false;
+        string errorMessage = "";
 
-        using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
+        // Start process (outside yield context)
+        try
         {
-            byte[] bodyRaw = Encoding.UTF8.GetBytes(json);
-            request.uploadHandler = new UploadHandlerRaw(bodyRaw);
-            request.downloadHandler = new DownloadHandlerBuffer();
+            process = Process.Start(psi);
+            processStarted = true;
+        }
+        catch (System.Exception e)
+        {
+            errorMessage = e.Message;
+            processStarted = false;
+        }
 
-            request.SetRequestHeader("Authorization", "Bearer " + apiKey);
-            request.SetRequestHeader("Content-Type", "application/json");
-            request.SetRequestHeader("Accept", "audio/wav");
+        if (!processStarted || process == null)
+        {
+            Debug.LogError($"❌ Failed to start Piper process: {errorMessage}");
+            onComplete?.Invoke(null);
+            yield break;
+        }
 
-            yield return request.SendWebRequest();
+        // Write text to stdin
+        process.StandardInput.WriteLine(text);
+        process.StandardInput.Close();
 
-            if (request.result != UnityWebRequest.Result.Success)
-            {
-                Debug.LogError("❌ TTS Error: " + request.error);
-                Debug.LogError("Response: " + request.downloadHandler.text);
-                Debug.Log("🔊 Will use fallback error sound if available");
-                onComplete?.Invoke(null);
-                yield break;
-            }
+        // Wait for process to complete (with timeout)
+        float timeout = 10f;
+        float elapsed = 0f;
+        while (!process.HasExited && elapsed < timeout)
+        {
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
 
-            byte[] audioData = request.downloadHandler.data;
-            if (audioData == null || audioData.Length == 0)
-            {
-                Debug.LogError("⚠️ Empty audio response from TTS");
-                Debug.Log("🔊 Will use fallback error sound if available");
-                onComplete?.Invoke(null);
-                yield break;
-            }
+        if (!process.HasExited)
+        {
+            Debug.LogError("❌ Piper process timed out!");
+            process.Kill();
+            process.Dispose();
+            onComplete?.Invoke(null);
+            yield break;
+        }
 
-            AudioClip clip = WavUtility.ToAudioClip(audioData, 0, "GroqTTSClip");
+        string stderr = process.StandardError.ReadToEnd();
+        if (!string.IsNullOrEmpty(stderr))
+        {
+            Debug.LogWarning($"[Piper] {stderr}");
+        }
+
+        Debug.Log($"✅ Piper process completed with exit code: {process.ExitCode}");
+        process.Dispose();
+
+        // Wait for file to be created
+        float timer = 0f;
+        while (!File.Exists(outputPath) && timer < 5f)
+        {
+            timer += Time.deltaTime;
+            yield return null;
+        }
+
+        if (!File.Exists(outputPath))
+        {
+            Debug.LogError("❌ No WAV file generated by Piper!");
+            onComplete?.Invoke(null);
+            yield break;
+        }
+
+        // Load the audio clip
+        using (var www = new WWW("file://" + outputPath))
+        {
+            yield return www;
+
+            AudioClip clip = www.GetAudioClip(false, false, AudioType.WAV);
             if (clip != null)
             {
-                Debug.Log("✅ TTS clip generated successfully");
-                onComplete?.Invoke(clip);
+                Debug.Log($"✅ Piper TTS clip generated successfully: {piperVoiceName}");
+
+                // Apply volume adjustment by creating a modified clip
+                AudioClip adjustedClip = AdjustAudioClipVolume(clip, piperVolume);
+                onComplete?.Invoke(adjustedClip);
             }
             else
             {
-                Debug.LogError("❌ Failed to decode TTS audio clip");
-                Debug.Log("🔊 Will use fallback error sound if available");
+                Debug.LogError("❌ Failed to load Piper WAV file as AudioClip!");
                 onComplete?.Invoke(null);
             }
         }
+    }
+
+    private AudioClip AdjustAudioClipVolume(AudioClip originalClip, float volumeMultiplier)
+    {
+        if (originalClip == null || volumeMultiplier >= 0.99f)
+            return originalClip;
+
+        // Get the audio data
+        float[] samples = new float[originalClip.samples * originalClip.channels];
+        originalClip.GetData(samples, 0);
+
+        // Apply volume multiplier
+        for (int i = 0; i < samples.Length; i++)
+        {
+            samples[i] *= volumeMultiplier;
+        }
+
+        // Create new clip with adjusted volume
+        AudioClip adjustedClip = AudioClip.Create(
+            originalClip.name + "_Adjusted",
+            originalClip.samples,
+            originalClip.channels,
+            originalClip.frequency,
+            false
+        );
+        adjustedClip.SetData(samples, 0);
+
+        return adjustedClip;
     }
 
     #endregion
@@ -872,12 +1000,9 @@ public class ExamResultSceneController : MonoBehaviour
     }
 
     [System.Serializable]
-    public class SpeechRequest
+    public class GroqConfig
     {
-        public string model;
-        public string voice;
-        public string input;
-        public string response_format;
+        public string api_key;
     }
 
     #endregion

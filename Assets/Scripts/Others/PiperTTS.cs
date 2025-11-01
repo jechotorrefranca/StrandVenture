@@ -7,7 +7,7 @@ using Debug = UnityEngine.Debug;
 public class PiperTTS : MonoBehaviour
 {
     public AudioSource audioSource;
-    public string voiceName = "en_US-kusal-medium"; // Type the voice name here
+    public string voiceName = "en_US-hfc_male-medium"; // Type the voice name here
 
     private string piperPath;
     private string voicesDir;

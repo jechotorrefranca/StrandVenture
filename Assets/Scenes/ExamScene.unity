@@ -697,12 +697,12 @@ MonoBehaviour:
   idleSprite: {fileID: 21300000, guid: c5eec9ff87085d541b5836f75ef7ca37, type: 3}
   talkingSprite: {fileID: 21300000, guid: 5b7b4dde1ab40a049a7d260fb0b39db6, type: 3}
   botAudio: {fileID: 1090965995}
-  botDialogueClip: {fileID: 8300000, guid: d87dd61c55879a645a8522d0d0a8064f, type: 3}
+  botDialogueClip: {fileID: 8300000, guid: fe81cd6999f4775498c8ac4dbbaee512, type: 3}
   entranceDuration: 1
   floatAmplitude: 10
   floatSpeed: 1.5
   volumeThreshold: 0.02
-  examCompleteClip: {fileID: 8300000, guid: 8b0ad04d2738460408849530d347de9d, type: 3}
+  examCompleteClip: {fileID: 8300000, guid: 6e89246c1e76995429a694f2a288adba, type: 3}
   fadeOverlay: {fileID: 1117982054}
   nextSceneName: ExamResultScene
   examCanvas: {fileID: 438024279}
@@ -1375,7 +1375,7 @@ AudioSource:
   OutputAudioMixerGroup: {fileID: 0}
   m_audioClip: {fileID: 8300000, guid: d87dd61c55879a645a8522d0d0a8064f, type: 3}
   m_PlayOnAwake: 0
-  m_Volume: 0.53
+  m_Volume: 0.75
   m_Pitch: 1
   Loop: 0
   Mute: 0

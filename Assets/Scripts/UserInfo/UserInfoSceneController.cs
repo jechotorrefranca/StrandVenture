@@ -8,6 +8,9 @@ using TMPro;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine.Networking;
+using System.Diagnostics;
+using System.Threading.Tasks;
+using Debug = UnityEngine.Debug;
 
 [System.Serializable]
 public class GroqConfig
@@ -35,6 +38,13 @@ public class UserInfoSceneController : MonoBehaviour
     public float floatSpeed = 1.5f;
     public float volumeThreshold = 0.02f;
 
+    [Header("Piper TTS Settings")]
+    public string voiceName = "en_US-hfc_male-medium";
+    [Range(0f, 1f)]
+    public float ttsVolume = 0.5f;
+    private string piperPath;
+    private string voicesDir;
+
     [Header("Textbox UI")]
     public GameObject textboxContainer;
     public Button continueButton;
@@ -61,6 +71,7 @@ public class UserInfoSceneController : MonoBehaviour
     void Start()
     {
         LoadGroqApiKey();
+        InitializePiper();
 
         fadeOverlay.blocksRaycasts = true;
 
@@ -92,9 +103,14 @@ public class UserInfoSceneController : MonoBehaviour
         saveButton.onClick.AddListener(OnSaveButtonClicked);
     }
 
+    private void InitializePiper()
+    {
+        piperPath = Path.Combine(Application.streamingAssetsPath, "piper/piper.exe");
+        voicesDir = Path.Combine(Application.streamingAssetsPath, "piper/voices");
+    }
+
     private void LoadGroqApiKey()
     {
-
         string path;
 
 #if UNITY_EDITOR
@@ -118,8 +134,8 @@ public class UserInfoSceneController : MonoBehaviour
             Debug.LogError("Current Application.dataPath: " + Application.dataPath);
             Debug.LogError("Current Application.streamingAssetsPath: " + Application.streamingAssetsPath);
         }
-
     }
+
     private void ValidateForm()
     {
         string playerName = nameInput.text.Trim();
@@ -133,7 +149,6 @@ public class UserInfoSceneController : MonoBehaviour
 
     private IEnumerator SceneSequence()
     {
-
         yield return new WaitForSeconds(1f);
 
         yield return StartCoroutine(FadeCanvas(fadeOverlay, 1f, 0f, 1f));
@@ -175,7 +190,7 @@ public class UserInfoSceneController : MonoBehaviour
 
         Debug.Log($"Saved: Name={playerName}, Section={section}");
 
-        StartCoroutine(GetGroqNickname(playerName)); // 👈 Fetch nickname using Gro
+        StartCoroutine(GetGroqNickname(playerName));
 
         saveButton.interactable = false;
 
@@ -232,62 +247,100 @@ public class UserInfoSceneController : MonoBehaviour
         }
     }
 
-    private IEnumerator PlayGroqTTS(string text, System.Action<bool> onComplete)
+    private IEnumerator PlayPiperTTS(string text, System.Action<bool> onComplete)
     {
-        string url = "https://api.groq.com/openai/v1/audio/speech";
+        string outputPath = Path.Combine(Application.persistentDataPath, "piper_output.wav");
 
-        SpeechRequest payload = new SpeechRequest
+        // Generate audio on background thread
+        Task<bool> generateTask = Task.Run(() => GeneratePiperAudio(text, outputPath));
+
+        // Wait for generation to complete without blocking
+        while (!generateTask.IsCompleted)
         {
-            model = "playai-tts",
-            voice = "Chip-PlayAI",
-            input = text,
-            response_format = "wav"
-        };
+            yield return null;
+        }
 
-        string json = JsonUtility.ToJson(payload);
-        Debug.Log("➡️ Sending TTS JSON: " + json);
-
-        using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
+        if (!generateTask.Result)
         {
-            byte[] bodyRaw = Encoding.UTF8.GetBytes(json);
-            request.uploadHandler = new UploadHandlerRaw(bodyRaw);
-            request.downloadHandler = new DownloadHandlerBuffer();
+            Debug.LogError("❌ Failed to generate TTS audio!");
+            onComplete?.Invoke(false);
+            yield break;
+        }
 
-            request.SetRequestHeader("Authorization", "Bearer " + apiKey);
-            request.SetRequestHeader("Content-Type", "application/json");
-            request.SetRequestHeader("Accept", "audio/wav");
-
-            yield return request.SendWebRequest();
-
-            if (request.result != UnityWebRequest.Result.Success)
-            {
-                Debug.LogError("TTS Error: " + request.error);
-                Debug.LogError("Response: " + request.downloadHandler.text);
-                onComplete?.Invoke(false);
-                yield break;
-            }
-
-            byte[] audioData = request.downloadHandler.data;
-            if (audioData == null || audioData.Length == 0)
-            {
-                Debug.LogError("⚠️ Empty audio response.");
-                onComplete?.Invoke(false);
-                yield break;
-            }
-
-            AudioClip clip = WavUtility.ToAudioClip(audioData, 0, "GroqTTSClip");
+        // Load the audio file
+        using (var www = new WWW("file://" + outputPath))
+        {
+            yield return www;
+            var clip = www.GetAudioClip(false, false, AudioType.WAV);
             if (clip != null)
             {
+                float originalVolume = botAudio.volume;
+                botAudio.volume = ttsVolume;
                 botAudio.clip = clip;
                 botAudio.Play();
+                Debug.Log($"✅ Playing Piper TTS: {voiceName} at volume {ttsVolume}");
                 yield return StartCoroutine(BotTalkAnimation());
+                botAudio.volume = originalVolume;
                 onComplete?.Invoke(true);
             }
             else
             {
-                Debug.LogError("Failed to decode audio clip.");
+                Debug.LogError("❌ Failed to load WAV!");
                 onComplete?.Invoke(false);
             }
+        }
+    }
+
+    private bool GeneratePiperAudio(string text, string outputPath)
+    {
+        try
+        {
+            string modelPath = Path.Combine(voicesDir, voiceName + ".onnx");
+
+            if (!File.Exists(modelPath))
+            {
+                Debug.LogError($"❌ Voice not found: {voiceName}");
+                return false;
+            }
+
+            if (File.Exists(outputPath)) File.Delete(outputPath);
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = piperPath,
+                Arguments = $"--model \"{modelPath}\" --output_file \"{outputPath}\" --output_format wav",
+                RedirectStandardInput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WorkingDirectory = Path.GetDirectoryName(piperPath)
+            };
+
+            using (var process = Process.Start(psi))
+            {
+                process.StandardInput.WriteLine(text);
+                process.StandardInput.Close();
+                process.WaitForExit();
+
+                string stderr = process.StandardError.ReadToEnd();
+                if (!string.IsNullOrEmpty(stderr)) Debug.LogWarning($"[Piper] {stderr}");
+            }
+
+            // Wait for file to be written
+            int maxAttempts = 50;
+            int attempts = 0;
+            while (!File.Exists(outputPath) && attempts < maxAttempts)
+            {
+                System.Threading.Thread.Sleep(100);
+                attempts++;
+            }
+
+            return File.Exists(outputPath);
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"❌ Piper generation error: {e.Message}");
+            return false;
         }
     }
 
@@ -337,8 +390,8 @@ public class UserInfoSceneController : MonoBehaviour
         string nickname = PlayerPrefs.GetString("PlayerNickname", "friend");
         bool ttsSuccess = false;
 
-        string ttsLine = $"(Excited) Awesome name, {nickname}!";
-        yield return StartCoroutine(PlayGroqTTS(ttsLine, success => ttsSuccess = success));
+        string ttsLine = $"Awesome name, {nickname}!";
+        yield return StartCoroutine(PlayPiperTTS(ttsLine, success => ttsSuccess = success));
 
         if (!ttsSuccess)
         {
@@ -403,7 +456,6 @@ public class UserInfoSceneController : MonoBehaviour
         saveButton.image.color = saveButtonOriginalColor;
     }
 
-
     private IEnumerator FadeCanvas(CanvasGroup group, float from, float to, float duration)
     {
         group.blocksRaycasts = true;
@@ -452,7 +504,7 @@ public class UserInfoSceneController : MonoBehaviour
     private IEnumerator BotTalkAnimation()
     {
         RectTransform rt = botContainer.GetComponent<RectTransform>();
-        Vector2 basePos = botOriginalPos;
+        Vector2 basePos = rt.anchoredPosition;
 
         float[] samples = new float[512];
         float floatTime = 0f;
@@ -461,7 +513,6 @@ public class UserInfoSceneController : MonoBehaviour
 
         while (botAudio.isPlaying)
         {
-
             botAudio.GetOutputData(samples, 0);
             float sum = 0f;
             for (int i = 0; i < samples.Length; i++) sum += samples[i] * samples[i];
@@ -535,40 +586,6 @@ public class UserInfoSceneController : MonoBehaviour
         botRT.localEulerAngles = Vector3.zero;
     }
 
-    private IEnumerator MoveBotUpSlightly()
-    {
-        RectTransform rt = botContainer.GetComponent<RectTransform>();
-        Vector2 startPos = rt.anchoredPosition;
-        Vector2 endPos = startPos + new Vector2(0, 100);
-        float elapsed = 0f;
-
-        while (elapsed < 0.8f)
-        {
-            float t = Mathf.SmoothStep(0f, 1f, elapsed / 0.8f);
-            rt.anchoredPosition = Vector2.Lerp(startPos, endPos, t);
-            elapsed += Time.deltaTime;
-            yield return null;
-        }
-    }
-
-    private IEnumerator SlideUpTextbox()
-    {
-        RectTransform rt = textboxContainer.GetComponent<RectTransform>();
-        Vector2 startPos = textboxOriginalPos + new Vector2(0, -600);
-        Vector2 endPos = textboxOriginalPos;
-        float elapsed = 0f;
-
-        while (elapsed < textboxMoveDuration)
-        {
-            float t = Mathf.SmoothStep(0f, 1f, elapsed / textboxMoveDuration);
-            rt.anchoredPosition = Vector2.Lerp(startPos, endPos, t);
-            elapsed += Time.deltaTime;
-            yield return null;
-        }
-
-        rt.anchoredPosition = endPos;
-    }
-
     private IEnumerator BotFloatingMotion()
     {
         RectTransform rt = botContainer.GetComponent<RectTransform>();
@@ -607,14 +624,5 @@ public class UserInfoSceneController : MonoBehaviour
     {
         public string model;
         public List<Message> messages;
-    }
-
-    [System.Serializable]
-    public class SpeechRequest
-    {
-        public string model;
-        public string voice;
-        public string input;
-        public string response_format;
     }
 }

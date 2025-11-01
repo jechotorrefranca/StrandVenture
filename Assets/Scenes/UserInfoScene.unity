@@ -491,7 +491,9 @@ MonoBehaviour:
   entranceDuration: 1
   floatAmplitude: 10
   floatSpeed: 1.5
-  volumeThreshold: 0.03
+  volumeThreshold: 0.02
+  voiceName: en_US-hfc_male-medium
+  ttsVolume: 0.351
   textboxContainer: {fileID: 1540023915}
   continueButton: {fileID: 1556286342}
   textboxMoveDuration: 0.7
@@ -499,8 +501,8 @@ MonoBehaviour:
   sectionDropdown: {fileID: 1833183274}
   saveButton: {fileID: 1556286342}
   saveButtonPressedColor: {r: 0.65199995, g: 0.49039313, b: 0.13931622, a: 1}
-  errorClip: {fileID: 8300000, guid: 3e22fc7e8143a2a4892df9b5e54eae67, type: 3}
-  getReadyClip: {fileID: 8300000, guid: 1314c928ead055c41a427592568476ce, type: 3}
+  errorClip: {fileID: 8300000, guid: cba3cabec168fa240a424248e933db30, type: 3}
+  getReadyClip: {fileID: 8300000, guid: 7b56f080b2263f64aa5ddcc4192a187c, type: 3}
 --- !u!4 &309314117
 Transform:
   m_ObjectHideFlags: 0
@@ -3259,9 +3261,9 @@ AudioSource:
   m_Enabled: 1
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
-  m_audioClip: {fileID: 8300000, guid: bad8ad08caf0f1441a05230b80a54391, type: 3}
+  m_audioClip: {fileID: 8300000, guid: 84568914ec1a57241835b07a8006aec6, type: 3}
   m_PlayOnAwake: 0
-  m_Volume: 0.368
+  m_Volume: 0.75
   m_Pitch: 1
   Loop: 0
   Mute: 0
