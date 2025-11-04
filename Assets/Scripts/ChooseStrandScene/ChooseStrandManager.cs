@@ -660,7 +660,7 @@ public class ChooseStrandManager : MonoBehaviour
 
         if (Application.CanStreamedLevelBeLoaded(sceneName))
         {
-            SceneManager.LoadScene(sceneName);
+            SceneLoader.LoadSceneWithLoading(sceneName);
         }
         else
         {
