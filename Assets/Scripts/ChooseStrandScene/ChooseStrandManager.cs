@@ -38,7 +38,7 @@ public class ChooseStrandManager : MonoBehaviour
     public Button rightButton;
     public Button selectButton;
     public TMP_Text descriptionText;
-    public GameObject carouselContainer; // NEW: Container for all carousel elements
+    public GameObject carouselContainer;
 
     [Header("Input Settings")]
     public bool useKeyboardInput = true;
@@ -53,16 +53,16 @@ public class ChooseStrandManager : MonoBehaviour
     public float soundThreshold = 0.01f;
     public float botEntranceDuration = 1f;
     public float botExitDuration = 0.8f;
-    public float botFloatAmount = 10f; // How much the bot moves up/down while floating
-    public float botFloatSpeed = 2f; // Speed of the floating animation
-    public float carouselFadeInDuration = 0.8f; // Duration for carousel fade in
+    public float botFloatAmount = 10f;
+    public float botFloatSpeed = 2f;
+    public float carouselFadeInDuration = 0.8f;
 
     private int currentIndex = 0;
     private bool isAnimating = false;
     private bool introComplete = false;
     private AudioSource audioSource;
-    private Vector3 botOriginalPosition; // Store bot's original position for floating
-    private Coroutine floatingCoroutine; // Reference to floating coroutine
+    private Vector3 botOriginalPosition;
+    private Coroutine floatingCoroutine;
 
     private void Start()
     {
@@ -73,20 +73,17 @@ public class ChooseStrandManager : MonoBehaviour
             return;
         }
 
-        // Setup audio source
         audioSource = gameObject.AddComponent<AudioSource>();
         audioSource.playOnAwake = false;
 
         SortStrandsByBest();
 
-        // Hide carousel container initially
         if (carouselContainer != null)
         {
             carouselContainer.SetActive(false);
         }
         else
         {
-            // Fallback: Hide individual cards if container not assigned
             foreach (var strand in strands)
             {
                 if (strand.cardObject != null)
@@ -96,38 +93,32 @@ public class ChooseStrandManager : MonoBehaviour
             }
         }
 
-        // Disable buttons during intro
         if (leftButton != null) leftButton.interactable = false;
         if (rightButton != null) rightButton.interactable = false;
         if (selectButton != null) selectButton.interactable = false;
 
-        // Start intro sequence
         StartCoroutine(IntroSequence());
     }
 
     private IEnumerator IntroSequence()
     {
-        // Start with black screen
         if (fadeOverlay != null)
         {
             fadeOverlay.alpha = 1f;
             fadeOverlay.gameObject.SetActive(true);
         }
 
-        // Set bot to idle initially and start small
         if (botImage != null && botIdleSprite != null)
         {
             botImage.sprite = botIdleSprite;
             botImage.gameObject.SetActive(true);
-            botImage.transform.localScale = Vector3.zero; // Start at zero scale
+            botImage.transform.localScale = Vector3.zero;
             botImage.transform.localRotation = Quaternion.identity;
-            botOriginalPosition = botImage.transform.localPosition; // Store original position
+            botOriginalPosition = botImage.transform.localPosition;
         }
 
-        // Wait a moment before starting
         yield return new WaitForSeconds(0.5f);
 
-        // Fade in from black
         if (fadeOverlay != null)
         {
             float elapsed = 0f;
@@ -138,10 +129,9 @@ public class ChooseStrandManager : MonoBehaviour
                 yield return null;
             }
             fadeOverlay.alpha = 0f;
-            fadeOverlay.gameObject.SetActive(false); // Disable after fade
+            fadeOverlay.gameObject.SetActive(false);
         }
 
-        // Animate bot entrance: scale up and spin 360 degrees
         if (botImage != null)
         {
             float elapsed = 0f;
@@ -152,10 +142,8 @@ public class ChooseStrandManager : MonoBehaviour
                 float t = elapsed / botEntranceDuration;
                 float smoothT = Mathf.SmoothStep(0, 1, t);
 
-                // Scale from 0 to 1
                 botImage.transform.localScale = Vector3.Lerp(Vector3.zero, originalScale, smoothT);
 
-                // Rotate 360 degrees
                 float rotation = Mathf.Lerp(0f, 360f, smoothT);
                 botImage.transform.localRotation = Quaternion.Euler(0, 0, rotation);
 
@@ -163,15 +151,12 @@ public class ChooseStrandManager : MonoBehaviour
                 yield return null;
             }
 
-            // Ensure final values
             botImage.transform.localScale = originalScale;
             botImage.transform.localRotation = Quaternion.identity;
         }
 
-        // Play bot intro audio if available
         if (botIntroClip != null && audioSource != null)
         {
-            // Start floating animation
             if (botImage != null)
             {
                 floatingCoroutine = StartCoroutine(FloatBot());
@@ -180,39 +165,32 @@ public class ChooseStrandManager : MonoBehaviour
             audioSource.clip = botIntroClip;
             audioSource.Play();
 
-            // Animate bot while speaking
             if (botImage != null && botTalkingSprite != null && botIdleSprite != null)
             {
                 StartCoroutine(AnimateBotSpeaking());
             }
 
-            // Wait for audio to finish
             yield return new WaitForSeconds(botIntroClip.length);
 
-            // Stop floating animation
             if (floatingCoroutine != null)
             {
                 StopCoroutine(floatingCoroutine);
                 floatingCoroutine = null;
             }
 
-            // Reset bot position to original
             if (botImage != null)
             {
                 botImage.transform.localPosition = botOriginalPosition;
             }
         }
 
-        // Set bot back to idle
         if (botImage != null && botIdleSprite != null)
         {
             botImage.sprite = botIdleSprite;
         }
 
-        // Wait a moment before exit animation
         yield return new WaitForSeconds(0.3f);
 
-        // Animate bot exit: spin and scale down
         if (botImage != null)
         {
             float elapsed = 0f;
@@ -223,10 +201,8 @@ public class ChooseStrandManager : MonoBehaviour
                 float t = elapsed / botExitDuration;
                 float smoothT = Mathf.SmoothStep(0, 1, t);
 
-                // Scale from 1 to 0
                 botImage.transform.localScale = Vector3.Lerp(originalScale, Vector3.zero, smoothT);
 
-                // Rotate 360 degrees
                 float rotation = Mathf.Lerp(0f, 360f, smoothT);
                 botImage.transform.localRotation = Quaternion.Euler(0, 0, rotation);
 
@@ -234,31 +210,24 @@ public class ChooseStrandManager : MonoBehaviour
                 yield return null;
             }
 
-            // Hide bot
             botImage.gameObject.SetActive(false);
         }
 
-        // Wait a moment before showing carousel
         yield return new WaitForSeconds(0.3f);
 
-        // Initialize carousel positions BEFORE showing it
         UpdateCarouselInstant();
 
-        // Show and fade in carousel container
         if (carouselContainer != null)
         {
-            // Add CanvasGroup if not present
             CanvasGroup carouselCanvasGroup = carouselContainer.GetComponent<CanvasGroup>();
             if (carouselCanvasGroup == null)
             {
                 carouselCanvasGroup = carouselContainer.AddComponent<CanvasGroup>();
             }
 
-            // Set alpha to 0 before activating
             carouselCanvasGroup.alpha = 0f;
             carouselContainer.SetActive(true);
 
-            // Fade in carousel
             float elapsed = 0f;
 
             while (elapsed < carouselFadeInDuration)
@@ -272,7 +241,6 @@ public class ChooseStrandManager : MonoBehaviour
             carouselCanvasGroup.alpha = 1f;
         }
 
-        // Enable buttons
         if (leftButton != null)
         {
             leftButton.interactable = true;
@@ -314,7 +282,6 @@ public class ChooseStrandManager : MonoBehaviour
 
         while (audioSource.isPlaying)
         {
-            // Sample audio to detect if sound is playing
             float[] samples = new float[256];
             audioSource.GetOutputData(samples, 0);
 
@@ -325,7 +292,6 @@ public class ChooseStrandManager : MonoBehaviour
             }
             float average = sum / samples.Length;
 
-            // Switch sprite based on audio volume
             if (average > soundThreshold)
             {
                 botImage.sprite = botTalkingSprite;
@@ -338,7 +304,6 @@ public class ChooseStrandManager : MonoBehaviour
             yield return new WaitForSeconds(0.1f);
         }
 
-        // Ensure idle sprite at the end
         botImage.sprite = botIdleSprite;
     }
 
@@ -379,7 +344,6 @@ public class ChooseStrandManager : MonoBehaviour
         if (selectButton == null) { Debug.LogError("Select Button is not assigned!"); isValid = false; }
         if (descriptionText == null) { Debug.LogError("Description Text is not assigned!"); isValid = false; }
 
-        // Warn about optional references
         if (carouselContainer == null) Debug.LogWarning("Carousel Container is not assigned - will hide individual cards instead");
         if (fadeOverlay == null) Debug.LogWarning("Fade Overlay is not assigned - intro animation will be skipped");
         if (botImage == null) Debug.LogWarning("Bot Image is not assigned - bot animation will be skipped");
@@ -512,13 +476,12 @@ public class ChooseStrandManager : MonoBehaviour
         int prevIndex = GetPreviousIndex();
         int nextNextIndex = GetNextIndex();
 
-        // Calculate the card that will come from behind
         int incomingIndex;
-        if (direction > 0) // Moving right
+        if (direction > 0)
         {
             incomingIndex = (nextNextIndex + 1 + strands.Count) % strands.Count;
         }
-        else // Moving left
+        else
         {
             incomingIndex = (prevIndex - 1 + strands.Count) % strands.Count;
         }
@@ -534,13 +497,11 @@ public class ChooseStrandManager : MonoBehaviour
             yield break;
         }
 
-        // Activate all cards
         leftCard.SetActive(true);
         centerCard.SetActive(true);
         rightCard.SetActive(true);
         incomingCard.SetActive(true);
 
-        // Store starting values
         Vector3 leftStartPos = leftCard.transform.localPosition;
         Vector3 centerStartPos = centerCard.transform.localPosition;
         Vector3 rightStartPos = rightCard.transform.localPosition;
@@ -557,7 +518,7 @@ public class ChooseStrandManager : MonoBehaviour
         float leftEndScale, centerEndScale, rightEndScale, incomingStartScale, incomingEndScale;
         float leftEndAlpha, centerEndAlpha, rightEndAlpha, incomingStartAlpha, incomingEndAlpha;
 
-        if (direction > 0) // Moving RIGHT (Next)
+        if (direction > 0)
         {
             leftEndPos = backPosition;
             leftEndScale = backScale;
@@ -582,7 +543,7 @@ public class ChooseStrandManager : MonoBehaviour
             incomingEndAlpha = sideAlpha;
             SetSortingOrder(incomingCard, 1);
         }
-        else // Moving LEFT (Previous)
+        else
         {
             rightEndPos = backPosition;
             rightEndScale = backScale;
@@ -608,14 +569,12 @@ public class ChooseStrandManager : MonoBehaviour
             SetSortingOrder(incomingCard, 1);
         }
 
-        // Set incoming card initial state
         incomingCard.transform.localPosition = incomingStartPos;
         incomingCard.transform.localScale = Vector3.one * incomingStartScale;
         SetCardAlpha(incomingCard, incomingStartAlpha);
 
         float elapsed = 0f;
 
-        // Animate all cards
         while (elapsed < transitionDuration)
         {
             float t = elapsed / transitionDuration;
@@ -669,7 +628,6 @@ public class ChooseStrandManager : MonoBehaviour
     {
         isAnimating = true;
 
-        // Disable buttons to prevent multiple clicks
         if (leftButton != null) leftButton.interactable = false;
         if (rightButton != null) rightButton.interactable = false;
         if (selectButton != null) selectButton.interactable = false;
@@ -682,7 +640,6 @@ public class ChooseStrandManager : MonoBehaviour
         PlayerPrefs.SetString("SelectedStrand", selectedStrand);
         PlayerPrefs.Save();
 
-        // Fade to black
         if (fadeOverlay != null)
         {
             fadeOverlay.gameObject.SetActive(true);
@@ -699,10 +656,8 @@ public class ChooseStrandManager : MonoBehaviour
             fadeOverlay.alpha = 1f;
         }
 
-        // Small delay before scene transition
         yield return new WaitForSeconds(0.2f);
 
-        // Load scene
         if (Application.CanStreamedLevelBeLoaded(sceneName))
         {
             SceneManager.LoadScene(sceneName);
@@ -711,14 +666,12 @@ public class ChooseStrandManager : MonoBehaviour
         {
             Debug.LogError($"Scene '{sceneName}' not found in build settings! Please add it to File > Build Settings > Scenes in Build");
 
-            // Fade back if scene not found
             if (fadeOverlay != null)
             {
                 fadeOverlay.alpha = 0f;
                 fadeOverlay.gameObject.SetActive(false);
             }
 
-            // Re-enable buttons
             if (leftButton != null) leftButton.interactable = true;
             if (rightButton != null) rightButton.interactable = true;
             if (selectButton != null) selectButton.interactable = true;
