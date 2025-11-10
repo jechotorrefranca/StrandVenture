@@ -18,6 +18,9 @@ public class IntroSceneController : MonoBehaviour
     [Tooltip("The bot 3D model GameObject")]
     public GameObject botModel;
 
+    [Tooltip("The bot's mesh/child object that has the Animation component (leave empty if animations are on botModel)")]
+    public GameObject botMeshChild;
+
     [Tooltip("AudioSource component on the bot")]
     public AudioSource botAudioSource;
 
@@ -30,6 +33,9 @@ public class IntroSceneController : MonoBehaviour
     [Tooltip("CanvasGroup for fading video in/out")]
     public CanvasGroup videoCanvasGroup;
 
+    [Tooltip("Light that illuminates scene when video plays")]
+    public Light videoLight;
+
     [Header("Animation Settings")]
     [Tooltip("Target light intensity")]
     public float targetLightIntensity = 5f;
@@ -37,6 +43,9 @@ public class IntroSceneController : MonoBehaviour
     [Tooltip("Bot floating animation settings")]
     public float floatAmplitude = 0.3f;
     public float floatSpeed = 1f;
+
+    [Tooltip("Video light intensity")]
+    public float videoLightIntensity = 3f;
 
     [Header("Light & Sound Effects")]
     [Tooltip("Sound effect when lights turn on (plays with spotlight)")]
@@ -104,10 +113,10 @@ public class IntroSceneController : MonoBehaviour
 
     // For screen fading
     private Texture2D fadeTexture;
-    private float fadeAlpha = 0f; // Start transparent (no black screen)
+    private float fadeAlpha = 0f;
 
     // For bot floating animation
-    private Vector3 botOriginalPosition;
+    private Vector3 botBasePosition;
     private float floatTimer = 0f;
 
     // For bot animation
@@ -155,15 +164,29 @@ public class IntroSceneController : MonoBehaviour
             reverb.decayTime = 3.0f;
         }
 
-        // Get bot animator component
+        // Get bot animator component and store initial position
         if (botModel != null)
         {
-            botAnimator = botModel.GetComponent<Animation>();
+            botAnimator = botMeshChild.GetComponent<Animation>();
             if (botAnimator == null)
             {
-                botAnimator = botModel.AddComponent<Animation>();
+                botAnimator = botMeshChild.AddComponent<Animation>();
             }
-            botOriginalPosition = botModel.transform.position;
+
+            // Disable animation culling to ensure animations play correctly
+            botAnimator.cullingType = AnimationCullingType.AlwaysAnimate;
+
+            // Set initial position and rotation based on first position
+            if (initialBotPosition != null)
+            {
+                botModel.transform.position = initialBotPosition.position;
+                botModel.transform.rotation = initialBotPosition.rotation;
+            }
+
+            botBasePosition = botModel.transform.position;
+
+            // Start bot as inactive
+            botModel.SetActive(false);
         }
 
         // Prepare video player
@@ -176,7 +199,7 @@ public class IntroSceneController : MonoBehaviour
             videoPlayer.loopPointReached += OnVideoFinished;
         }
 
-        // Setup canvas group for video fading if not assigned
+        // Setup canvas group for video fading
         if (videoCanvasGroup == null && videoCanvas != null)
         {
             videoCanvasGroup = videoCanvas.GetComponent<CanvasGroup>();
@@ -184,6 +207,23 @@ public class IntroSceneController : MonoBehaviour
             {
                 videoCanvasGroup = videoCanvas.AddComponent<CanvasGroup>();
             }
+        }
+
+        // Start video canvas as invisible
+        if (videoCanvasGroup != null)
+        {
+            videoCanvasGroup.alpha = 0f;
+        }
+        if (videoCanvas != null)
+        {
+            videoCanvas.SetActive(false);
+        }
+
+        // Setup video light
+        if (videoLight != null)
+        {
+            videoLight.enabled = false;
+            videoLight.intensity = videoLightIntensity;
         }
 
         // Start the sequence
@@ -209,7 +249,11 @@ public class IntroSceneController : MonoBehaviour
             {
                 floatTimer += Time.deltaTime * floatSpeed;
                 float yOffset = Mathf.Sin(floatTimer) * floatAmplitude;
-                botModel.transform.position = botOriginalPosition + new Vector3(0, yOffset, 0);
+
+                // Only apply floating offset - don't touch rotation
+                // The animation system will handle rotation
+                Vector3 targetPos = botBasePosition + new Vector3(0, yOffset, 0);
+                botModel.transform.position = targetPos;
             }
             yield return null;
         }
@@ -218,6 +262,7 @@ public class IntroSceneController : MonoBehaviour
     IEnumerator IntroSequence()
     {
         yield return new WaitForSeconds(2f);
+
         // SEQUENCE 1: Light opens with SFX and bot appears INSTANTLY
         if (ufoLight != null)
         {
@@ -280,11 +325,11 @@ public class IntroSceneController : MonoBehaviour
     {
         if (audio == null) yield break;
 
-        // Move bot to position
+        // Move bot to position and rotation
         if (targetPosition != null && botModel != null)
         {
-            yield return StartCoroutine(MoveBotToPosition(targetPosition.position, 1f));
-            botOriginalPosition = targetPosition.position;
+            yield return StartCoroutine(MoveBotToPositionAndRotation(targetPosition, 1f));
+            botBasePosition = targetPosition.position;
         }
 
         // Play animation
@@ -292,6 +337,11 @@ public class IntroSceneController : MonoBehaviour
         {
             Debug.Log("Playing bot animation: " + animation.name);
             botAnimator.AddClip(animation, animation.name);
+            AnimationState animState = botAnimator[animation.name];
+            if (animState != null)
+            {
+                animState.wrapMode = WrapMode.Once;
+            }
             botAnimator.Play(animation.name);
         }
 
@@ -306,32 +356,44 @@ public class IntroSceneController : MonoBehaviour
         yield return new WaitForSeconds(0.5f);
     }
 
-    IEnumerator MoveBotToPosition(Vector3 targetPos, float duration)
+    IEnumerator MoveBotToPositionAndRotation(Transform target, float duration)
     {
         Vector3 startPos = botModel.transform.position;
+        Quaternion startRot = botModel.transform.rotation;
+        Vector3 targetPos = target.position;
+        Quaternion targetRot = target.rotation;
         float elapsed = 0f;
 
         while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
             float t = elapsed / duration;
-            botModel.transform.position = Vector3.Lerp(startPos, targetPos, t);
+
+            // Update base position for floating
+            botBasePosition = Vector3.Lerp(startPos, targetPos, t);
+
+            // Apply rotation to the bot model
+            botModel.transform.rotation = Quaternion.Slerp(startRot, targetRot, t);
             yield return null;
         }
 
-        botModel.transform.position = targetPos;
+        botBasePosition = targetPos;
+        botModel.transform.rotation = targetRot;
     }
 
     IEnumerator PlayVideoWithTimedAudio(VideoClip video, TimedAudioWithPosition[] timedAudios)
     {
         if (video == null) yield break;
 
-        // Fade in video
-        yield return StartCoroutine(FadeInVideo());
-
-        // Prepare and play video
-        videoPlayer.Stop();
+        // Enable canvas and set alpha to 0 first
         videoCanvas.SetActive(true);
+        if (videoCanvasGroup != null)
+        {
+            videoCanvasGroup.alpha = 0f;
+        }
+
+        // Prepare video (must be active to prepare)
+        videoPlayer.Stop();
         videoPlayer.clip = video;
         videoPlayer.playbackSpeed = 1f;
         videoPlayer.isLooping = false;
@@ -348,10 +410,20 @@ public class IntroSceneController : MonoBehaviour
         if (!videoPlayer.isPrepared)
         {
             Debug.LogError("Video failed to prepare!");
-            yield return StartCoroutine(FadeOutVideo());
+            videoCanvas.SetActive(false);
             yield break;
         }
 
+        // Enable light
+        if (videoLight != null)
+        {
+            videoLight.enabled = true;
+        }
+
+        // Fade in video
+        yield return StartCoroutine(FadeInVideo());
+
+        // Play video
         videoPlayer.Play();
         Debug.Log("Video playing: " + video.name);
 
@@ -372,14 +444,19 @@ public class IntroSceneController : MonoBehaviour
                     // Move bot if position specified
                     if (timedAudio.botPosition != null && botModel != null)
                     {
-                        StartCoroutine(MoveBotToPosition(timedAudio.botPosition.position, 0.5f));
-                        botOriginalPosition = timedAudio.botPosition.position;
+                        StartCoroutine(MoveBotToPositionAndRotation(timedAudio.botPosition, 0.5f));
+                        botBasePosition = timedAudio.botPosition.position;
                     }
 
                     // Play animation
                     if (timedAudio.botAnimation != null && botAnimator != null)
                     {
                         botAnimator.AddClip(timedAudio.botAnimation, timedAudio.botAnimation.name);
+                        AnimationState animState = botAnimator[timedAudio.botAnimation.name];
+                        if (animState != null)
+                        {
+                            animState.wrapMode = WrapMode.Once;
+                        }
                         botAnimator.Play(timedAudio.botAnimation.name);
                     }
 
@@ -399,8 +476,13 @@ public class IntroSceneController : MonoBehaviour
 
         Debug.Log("Video finished");
 
-        // Fade out video
+        // Fade out video and disable light
         yield return StartCoroutine(FadeOutVideo());
+
+        if (videoLight != null)
+        {
+            videoLight.enabled = false;
+        }
 
         yield return new WaitForSeconds(0.5f);
     }
