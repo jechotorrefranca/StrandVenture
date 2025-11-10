@@ -5,8 +5,8 @@ public class SimpleFirstPersonCamera : MonoBehaviour
 {
     [Header("Camera Settings")]
     public float mouseSensitivity = 2f;
-    public float verticalLookLimit = 15f;
-    public float horizontalLookLimit = 20f;
+    public float verticalLookLimit = 80f;
+    public float horizontalLookLimit = 180f;
 
     [Header("Smoothing")]
     public float followDelay = 10f;
@@ -17,8 +17,9 @@ public class SimpleFirstPersonCamera : MonoBehaviour
 
     private Vector2 targetRotation;
     private Vector2 smoothedRotation;
-
     private Vector2 lookInput;
+
+    private Vector2 startRotation;
 
     void Start()
     {
@@ -27,6 +28,14 @@ public class SimpleFirstPersonCamera : MonoBehaviour
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
         }
+
+        Vector3 euler = transform.localRotation.eulerAngles;
+        float pitch = NormalizeAngle(euler.x);
+        float yaw = NormalizeAngle(euler.y);
+
+        startRotation = new Vector2(yaw, pitch);
+        targetRotation = startRotation;
+        smoothedRotation = startRotation;
     }
 
     void Update()
@@ -45,14 +54,17 @@ public class SimpleFirstPersonCamera : MonoBehaviour
         targetRotation.y = Mathf.Clamp(targetRotation.y, -verticalLookLimit, verticalLookLimit);
 
         if (lookInput == Vector2.zero)
-        {
-            targetRotation = Vector2.Lerp(targetRotation, Vector2.zero, returnSpeed * Time.deltaTime);
-        }
+            targetRotation = Vector2.Lerp(targetRotation, startRotation, returnSpeed * Time.deltaTime);
 
         smoothedRotation = Vector2.Lerp(smoothedRotation, targetRotation, followDelay * Time.deltaTime);
 
         transform.localRotation = Quaternion.Euler(smoothedRotation.y, smoothedRotation.x, 0f);
 
+        HandleCursor();
+    }
+
+    private void HandleCursor()
+    {
         if (Keyboard.current.escapeKey.wasPressedThisFrame)
         {
             Cursor.lockState = CursorLockMode.None;
@@ -68,7 +80,7 @@ public class SimpleFirstPersonCamera : MonoBehaviour
 
     public void SetCanLookAround(bool canLook)
     {
-        canLookAround = canLook;
+        this.canLookAround = canLook;
 
         if (!canLook)
         {
@@ -80,5 +92,12 @@ public class SimpleFirstPersonCamera : MonoBehaviour
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
         }
+    }
+
+    private float NormalizeAngle(float angle)
+    {
+        if (angle > 180f) return angle - 360f;
+        if (angle < -180f) return angle + 360f;
+        return angle;
     }
 }
