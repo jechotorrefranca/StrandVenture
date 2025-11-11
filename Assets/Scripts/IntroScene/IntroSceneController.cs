@@ -2,7 +2,6 @@ using UnityEngine;
 using UnityEngine.Video;
 using System.Collections;
 
-// Place this script on an empty GameObject called "SceneController"
 public class IntroSceneController : MonoBehaviour
 {
     [Header("Scene References")]
@@ -36,6 +35,39 @@ public class IntroSceneController : MonoBehaviour
     [Tooltip("Light that illuminates scene when video plays")]
     public Light videoLight;
 
+    [Header("Video Light Color Matching")]
+    public Light directionalLight;         // Your directional light
+    public RenderTexture videoRenderTexture; // Assign the same as VideoPlayer.targetTexture
+    [Header("Directional Light Fade Settings")]
+    public float dirLightFadeDuration = 1.2f;
+    public float dirLightTargetIntensity = 1.2f;
+
+    private float dirLightOriginalIntensity = 0f;
+
+
+    [Range(0f, 10f)] public float colorLerpSpeed = 5f; // Smooth transition
+    private float colorSampleTimer = 0f;
+    private float colorSampleInterval = 0.1f; // every 0.1 sec
+
+    private Texture2D videoTexture2D;
+
+    public GameObject mouthOpenMesh;
+    public GameObject mouthClosedMesh;
+
+    [Header("Bot Idle/Talk Animations")]
+    [Tooltip("Idle animation when bot is not talking")]
+    public AnimationClip idleAnimation;
+
+    [Tooltip("Talking animation when bot is speaking")]
+    public AnimationClip talkingAnimation;
+
+    [Tooltip("Audio volume threshold to trigger talking animation (0-1)")]
+    [Range(0f, 1f)]
+    public float audioThreshold = 0.01f;
+
+    [Tooltip("How often to check audio levels (in seconds)")]
+    public float audioCheckInterval = 0.05f;
+
     [Header("Animation Settings")]
     [Tooltip("Target light intensity")]
     public float targetLightIntensity = 5f;
@@ -45,7 +77,7 @@ public class IntroSceneController : MonoBehaviour
     public float floatSpeed = 1f;
 
     [Tooltip("Video light intensity")]
-    public float videoLightIntensity = 3f;
+    public float videoLightIntensity = 115f;
 
     [Header("Light & Sound Effects")]
     [Tooltip("Sound effect when lights turn on (plays with spotlight)")]
@@ -88,11 +120,13 @@ public class IntroSceneController : MonoBehaviour
     public Transform fourthBotPosition;
     public AnimationClip fourthBotAnimation;
 
-    [Header("Sequence 7: Fifth Bot Talk")]
-    [Tooltip("Audio with bot movement")]
+    [Header("Sequence 7: Fifth Bot Talk (now with Video + Audio together)")]
+    [Tooltip("Audio after fourth bot talk")]
     public AudioClip fifthBotAudio;
     public Transform fifthBotPosition;
     public AnimationClip fifthBotAnimation;
+    [Tooltip("Video to play concurrently with the fifth bot audio")]
+    public VideoClip fifthBotVideo; // NEW: video for 7th sequence
 
     [Header("Sequence 8: Sixth Bot Talk with Video Array")]
     [Tooltip("Multiple audio-video pairs")]
@@ -121,6 +155,11 @@ public class IntroSceneController : MonoBehaviour
 
     // For bot animation
     private Animation botAnimator;
+
+    // For audio detection
+    private float[] audioSamples = new float[128];
+    private bool isCurrentlyTalking = false;
+    private Coroutine audioMonitorCoroutine;
 
     void Start()
     {
@@ -167,14 +206,46 @@ public class IntroSceneController : MonoBehaviour
         // Get bot animator component and store initial position
         if (botModel != null)
         {
-            botAnimator = botMeshChild.GetComponent<Animation>();
-            if (botAnimator == null)
+            if (botMeshChild != null)
+                botAnimator = botMeshChild.GetComponent<Animation>();
+            else
+                botAnimator = botModel.GetComponent<Animation>();
+
+            if (botAnimator == null && botMeshChild != null)
             {
                 botAnimator = botMeshChild.AddComponent<Animation>();
             }
+            else if (botAnimator == null)
+            {
+                botAnimator = botModel.AddComponent<Animation>();
+            }
 
-            // Disable animation culling to ensure animations play correctly
-            botAnimator.cullingType = AnimationCullingType.AlwaysAnimate;
+            if (botAnimator != null)
+            {
+                // Disable animation culling to ensure animations play correctly
+                botAnimator.cullingType = AnimationCullingType.AlwaysAnimate;
+
+                // Setup idle and talking animations
+                if (idleAnimation != null)
+                {
+                    botAnimator.AddClip(idleAnimation, "Idle");
+                    AnimationState idleState = botAnimator["Idle"];
+                    if (idleState != null)
+                    {
+                        idleState.wrapMode = WrapMode.Loop;
+                    }
+                }
+
+                if (talkingAnimation != null)
+                {
+                    botAnimator.AddClip(talkingAnimation, "Talking");
+                    AnimationState talkState = botAnimator["Talking"];
+                    if (talkState != null)
+                    {
+                        talkState.wrapMode = WrapMode.Loop;
+                    }
+                }
+            }
 
             // Set initial position and rotation based on first position
             if (initialBotPosition != null)
@@ -231,6 +302,50 @@ public class IntroSceneController : MonoBehaviour
         StartCoroutine(FloatBot());
     }
 
+    void Update()
+    {
+        if (videoPlayer != null && videoPlayer.isPlaying)
+        {
+            colorSampleTimer += Time.deltaTime;
+            if (colorSampleTimer >= colorSampleInterval)
+            {
+                colorSampleTimer = 0f;
+                SampleVideoColor();
+            }
+        }
+    }
+
+    IEnumerator FadeDirectionalLight(float from, float to, float duration)
+    {
+        float elapsed = 0f;
+        if (directionalLight == null) yield break;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            directionalLight.intensity = Mathf.Lerp(from, to, elapsed / duration);
+            yield return null;
+        }
+
+        directionalLight.intensity = to;
+    }
+
+
+    void SampleVideoColor()
+    {
+        if (videoRenderTexture == null || directionalLight == null) return;
+
+        RenderTexture.active = videoRenderTexture;
+        Texture2D tex = new Texture2D(1, 1, TextureFormat.RGB24, false);
+        tex.ReadPixels(new Rect(videoRenderTexture.width / 2, videoRenderTexture.height / 2, 1, 1), 0, 0);
+        tex.Apply();
+        RenderTexture.active = null;
+
+        Color sampledColor = tex.GetPixel(0, 0);
+        directionalLight.color = Color.Lerp(directionalLight.color, sampledColor, colorLerpSpeed * Time.deltaTime);
+        Destroy(tex); // free memory
+    }
+
     void OnVideoPrepared(VideoPlayer source)
     {
         Debug.Log("Video prepared and ready to play");
@@ -259,6 +374,60 @@ public class IntroSceneController : MonoBehaviour
         }
     }
 
+    IEnumerator MonitorAudioAndSwitchAnimation()
+    {
+        isCurrentlyTalking = false;
+
+        while (botAudioSource != null && botAudioSource.isPlaying)
+        {
+            // Read audio samples every frame
+            botAudioSource.GetOutputData(audioSamples, 0);
+
+            float sum = 0f;
+            for (int i = 0; i < audioSamples.Length; i++)
+            {
+                sum += Mathf.Abs(audioSamples[i]);
+            }
+
+            float avgVolume = sum / audioSamples.Length;
+            bool shouldTalk = avgVolume > audioThreshold;
+
+            if (shouldTalk != isCurrentlyTalking)
+            {
+                isCurrentlyTalking = shouldTalk;
+
+                if (botAnimator != null)
+                {
+                    botAnimator.Stop();
+
+                    if (isCurrentlyTalking)
+                    {
+                        botAnimator.Play("Talking");
+                        SetMouthState(true);    // show open mouth
+                    }
+                    else
+                    {
+                        botAnimator.Play("Idle");
+                        SetMouthState(false);   // show closed mouth
+                    }
+                }
+            }
+
+            yield return null; // Check every frame
+        }
+
+        // Audio is finished. Reset to Idle immediately.
+        isCurrentlyTalking = false;
+        SetMouthState(false);
+        if (botAnimator != null) botAnimator.Play("Idle");
+    }
+
+    void SetMouthState(bool talking)
+    {
+        if (mouthOpenMesh != null) mouthOpenMesh.SetActive(talking);
+        if (mouthClosedMesh != null) mouthClosedMesh.SetActive(!talking);
+    }
+
     IEnumerator IntroSequence()
     {
         yield return new WaitForSeconds(2f);
@@ -277,6 +446,11 @@ public class IntroSceneController : MonoBehaviour
         if (botModel != null)
         {
             botModel.SetActive(true);
+            // Start with idle animation
+            if (idleAnimation != null && botAnimator != null)
+            {
+                botAnimator.Play("Idle");
+            }
         }
 
         yield return new WaitForSeconds(0.8f);
@@ -302,10 +476,10 @@ public class IntroSceneController : MonoBehaviour
         // SEQUENCE 6: Fourth bot talk (no video)
         yield return StartCoroutine(PlayBotAudio(fourthBotAudio, fourthBotPosition, fourthBotAnimation));
 
-        // SEQUENCE 7: Fifth bot talk
-        yield return StartCoroutine(PlayBotAudio(fifthBotAudio, fifthBotPosition, fifthBotAnimation));
+        // SEQUENCE 7: Fifth bot talk (now plays video & audio together)
+        yield return StartCoroutine(PlayBotAudioWithVideo(fifthBotAudio, fifthBotVideo, fifthBotPosition, fifthBotAnimation));
 
-        // SEQUENCE 8: Sixth sequence array with video
+        // SEQUENCE 8: Sixth sequence array with video (each audio & video start together)
         foreach (BotTalkWithVideo sequence in sixthSequenceArray)
         {
             yield return StartCoroutine(PlayBotTalkWithVideo(sequence));
@@ -321,69 +495,221 @@ public class IntroSceneController : MonoBehaviour
         // UnityEngine.SceneManagement.SceneManager.LoadScene("NextScene");
     }
 
-    IEnumerator PlayBotAudio(AudioClip audio, Transform targetPosition, AnimationClip animation)
+    IEnumerator PlayBotAudio(AudioClip audio, Transform targetPosition, AnimationClip transitionAnimation)
     {
         if (audio == null) yield break;
 
-        // Move bot to position and rotation
+        // Move bot and (optionally) play transition animation concurrently.
         if (targetPosition != null && botModel != null)
         {
-            yield return StartCoroutine(MoveBotToPositionAndRotation(targetPosition, 1f));
+            // Use 1f as default move duration when no transitionAnimation provided.
+            yield return StartCoroutine(MoveAndPlayTransition(targetPosition, 1f, transitionAnimation));
             botBasePosition = targetPosition.position;
         }
-
-        // Play animation
-        if (animation != null && botAnimator != null)
+        else if (transitionAnimation != null && botModel != null)
         {
-            Debug.Log("Playing bot animation: " + animation.name);
-            botAnimator.AddClip(animation, animation.name);
-            AnimationState animState = botAnimator[animation.name];
-            if (animState != null)
-            {
-                animState.wrapMode = WrapMode.Once;
-            }
-            botAnimator.Play(animation.name);
+            // If there's no move but a transition animation was given, just play the transition.
+            // pass current transform as target so coroutine has a valid non-null Transform
+            yield return StartCoroutine(MoveAndPlayTransition(botModel.transform, 0.01f, transitionAnimation));
         }
 
-        // Play audio
+        // Play audio and start monitoring
         if (botAudioSource != null)
         {
             botAudioSource.PlayOneShot(audio);
             Debug.Log("Playing bot audio: " + audio.name);
+
+            // Start monitoring audio for idle/talking switch
+            if (audioMonitorCoroutine != null)
+            {
+                StopCoroutine(audioMonitorCoroutine);
+            }
+            audioMonitorCoroutine = StartCoroutine(MonitorAudioAndSwitchAnimation());
+
             yield return new WaitForSeconds(audio.length);
         }
+
+        // Ensure we're back to idle after audio finishes
+        if (idleAnimation != null && botAnimator != null)
+        {
+            botAnimator.Play("Idle");
+        }
+        isCurrentlyTalking = false;
 
         yield return new WaitForSeconds(0.5f);
     }
 
-    IEnumerator MoveBotToPositionAndRotation(Transform target, float duration)
+    IEnumerator PlayBotAudioWithVideo(AudioClip audio, VideoClip video, Transform targetPosition, AnimationClip transitionAnimation)
     {
+        // This coroutine moves the bot (if needed), then starts the provided video and audio at the same time
+        // and waits until *both* have finished before continuing. It also uses the same fade & RT-clearing logic.
+
+        if (video == null && audio == null) yield break;
+
+        // Move / transition first
+        if (targetPosition != null && botModel != null)
+        {
+            yield return StartCoroutine(MoveAndPlayTransition(targetPosition, 1f, transitionAnimation));
+            botBasePosition = targetPosition.position;
+        }
+        else if (transitionAnimation != null && botModel != null)
+        {
+            yield return StartCoroutine(MoveAndPlayTransition(botModel.transform, 0.01f, transitionAnimation));
+        }
+
+        // If there's a video, prepare & clear RT to avoid showing last frame
+        if (video != null)
+        {
+            if (videoCanvas == null || videoPlayer == null)
+            {
+                Debug.LogError("Video canvas or VideoPlayer missing");
+            }
+            else
+            {
+                videoCanvas.SetActive(true);
+                if (videoCanvasGroup != null) videoCanvasGroup.alpha = 0f;
+
+                // Clear the rendertexture so last frame doesn't persist
+                ClearVideoRenderTexture();
+
+                videoPlayer.Stop();
+                videoPlayer.clip = video;
+                videoPlayer.Prepare();
+
+                float prepareTimeout = 10f;
+                float prepareTimer = 0f;
+                while (!videoPlayer.isPrepared && prepareTimer < prepareTimeout)
+                {
+                    prepareTimer += Time.deltaTime;
+                    yield return null;
+                }
+
+                if (!videoPlayer.isPrepared)
+                {
+                    Debug.LogError("Video failed to prepare!");
+                    videoCanvas.SetActive(false);
+                    yield break;
+                }
+
+                if (videoLight != null) videoLight.enabled = true;
+                yield return StartCoroutine(FadeInVideo());
+
+                videoPlayer.Play();
+                Debug.Log("Video playing (combined): " + video.name);
+            }
+        }
+
+        // Play audio concurrently
+        if (audio != null && botAudioSource != null)
+        {
+            botAudioSource.PlayOneShot(audio);
+            if (audioMonitorCoroutine != null) StopCoroutine(audioMonitorCoroutine);
+            audioMonitorCoroutine = StartCoroutine(MonitorAudioAndSwitchAnimation());
+            Debug.Log("Playing bot audio (combined): " + audio.name);
+        }
+
+        // Wait until both are finished (or whichever exists)
+        bool isVideoPlaying() => video != null && videoPlayer != null && videoPlayer.isPlaying;
+        bool isAudioPlaying() => botAudioSource != null && botAudioSource.isPlaying;
+
+        // Wait until neither is playing
+        while (isVideoPlaying() || isAudioPlaying())
+        {
+            yield return null;
+        }
+
+        // Ensure bot returns to idle
+        if (idleAnimation != null && botAnimator != null)
+            botAnimator.Play("Idle");
+        isCurrentlyTalking = false;
+
+        // Fade out video and disable light
+        if (video != null)
+        {
+            yield return StartCoroutine(FadeOutVideo());
+            if (videoLight != null) videoLight.enabled = false;
+        }
+
+        yield return new WaitForSeconds(0.2f);
+    }
+
+    IEnumerator MoveAndPlayTransition(Transform target, float defaultDuration, AnimationClip transitionClip = null)
+    {
+        if (botModel == null || target == null)
+            yield break;
+
+        // Determine movement duration: use transition clip length when provided (to sync).
+        float moveDuration = defaultDuration;
+        if (transitionClip != null && transitionClip.length > 0f)
+        {
+            moveDuration = transitionClip.length;
+        }
+
+        // Prepare/assign transition clip to animator under a unique name
+        string transName = null;
+        if (transitionClip != null && botAnimator != null)
+        {
+            transName = "__TRANS_" + transitionClip.name;
+            // Animation.GetClip returns AnimationClip or null
+            if (botAnimator.GetClip(transName) == null)
+            {
+                botAnimator.AddClip(transitionClip, transName);
+            }
+        }
+
+        // Start the animation if available
+        if (transName != null && botAnimator != null)
+        {
+            // Stop other animations and play transition
+            botAnimator.Stop();
+            botAnimator.Play(transName);
+            SetMouthState(false); // ensure mouth default while transitioning
+        }
+
+        // Movement interpolation over moveDuration
         Vector3 startPos = botModel.transform.position;
         Quaternion startRot = botModel.transform.rotation;
         Vector3 targetPos = target.position;
         Quaternion targetRot = target.rotation;
-        float elapsed = 0f;
 
-        while (elapsed < duration)
+        float elapsed = 0f;
+        while (elapsed < moveDuration)
         {
             elapsed += Time.deltaTime;
-            float t = elapsed / duration;
+            float t = Mathf.Clamp01(elapsed / moveDuration);
 
-            // Update base position for floating
+            // Update base position for floating (so FloatBot offsets correctly)
             botBasePosition = Vector3.Lerp(startPos, targetPos, t);
 
             // Apply rotation to the bot model
-            botModel.transform.rotation = Quaternion.Slerp(startRot, targetRot, t);
+            if (botModel != null)
+                botModel.transform.rotation = Quaternion.Slerp(startRot, targetRot, t);
+
             yield return null;
         }
 
+        // Ensure final values
         botBasePosition = targetPos;
-        botModel.transform.rotation = targetRot;
+        if (botModel != null)
+            botModel.transform.rotation = targetRot;
+
+        // Return to Idle after transition completes
+        if (idleAnimation != null && botAnimator != null)
+        {
+            botAnimator.Play("Idle");
+        }
     }
 
     IEnumerator PlayVideoWithTimedAudio(VideoClip video, TimedAudioWithPosition[] timedAudios)
     {
+        // This method keeps the same behavior but clears the render texture BEFORE preparing
         if (video == null) yield break;
+
+        if (videoCanvas == null || videoPlayer == null)
+        {
+            Debug.LogError("Video canvas or VideoPlayer missing");
+            yield break;
+        }
 
         // Enable canvas and set alpha to 0 first
         videoCanvas.SetActive(true);
@@ -391,6 +717,9 @@ public class IntroSceneController : MonoBehaviour
         {
             videoCanvasGroup.alpha = 0f;
         }
+
+        // Clear previous render texture to avoid showing previous frame
+        ClearVideoRenderTexture();
 
         // Prepare video (must be active to prepare)
         videoPlayer.Stop();
@@ -420,6 +749,14 @@ public class IntroSceneController : MonoBehaviour
             videoLight.enabled = true;
         }
 
+        // Fade directional light IN
+        if (directionalLight != null)
+        {
+            dirLightOriginalIntensity = directionalLight.intensity;
+            StartCoroutine(FadeDirectionalLight(0f, dirLightTargetIntensity, dirLightFadeDuration));
+        }
+
+
         // Fade in video
         yield return StartCoroutine(FadeInVideo());
 
@@ -427,44 +764,49 @@ public class IntroSceneController : MonoBehaviour
         videoPlayer.Play();
         Debug.Log("Video playing: " + video.name);
 
-        // Play timed audio during video
-        float videoStartTime = Time.time;
+        // Play timed audio during video using videoPlayer.time for timing
         int currentAudioIndex = 0;
 
         while (videoPlayer.isPlaying)
         {
-            float currentVideoTime = Time.time - videoStartTime;
+            double currentVideoTime = videoPlayer.time;
 
             // Check if we need to play next audio
-            if (currentAudioIndex < timedAudios.Length)
+            if (timedAudios != null && currentAudioIndex < timedAudios.Length)
             {
                 TimedAudioWithPosition timedAudio = timedAudios[currentAudioIndex];
                 if (currentVideoTime >= timedAudio.timestamp)
                 {
-                    // Move bot if position specified
+                    // Move + play transition concurrently so they finish together
                     if (timedAudio.botPosition != null && botModel != null)
                     {
-                        StartCoroutine(MoveBotToPositionAndRotation(timedAudio.botPosition, 0.5f));
+                        if (timedAudio.botAnimation != null)
+                        {
+                            yield return StartCoroutine(MoveAndPlayTransition(timedAudio.botPosition, 0.5f, timedAudio.botAnimation));
+                        }
+                        else
+                        {
+                            yield return StartCoroutine(MoveAndPlayTransition(timedAudio.botPosition, 0.5f, null));
+                        }
                         botBasePosition = timedAudio.botPosition.position;
                     }
-
-                    // Play animation
-                    if (timedAudio.botAnimation != null && botAnimator != null)
+                    else if (timedAudio.botAnimation != null && botModel != null)
                     {
-                        botAnimator.AddClip(timedAudio.botAnimation, timedAudio.botAnimation.name);
-                        AnimationState animState = botAnimator[timedAudio.botAnimation.name];
-                        if (animState != null)
-                        {
-                            animState.wrapMode = WrapMode.Once;
-                        }
-                        botAnimator.Play(timedAudio.botAnimation.name);
+                        // Play animation in-place
+                        yield return StartCoroutine(MoveAndPlayTransition(botModel.transform, 0.01f, timedAudio.botAnimation));
                     }
 
-                    // Play audio
+                    // Play the timed audio AFTER move/animation
                     if (timedAudio.audioClip != null && botAudioSource != null)
                     {
                         botAudioSource.PlayOneShot(timedAudio.audioClip);
                         Debug.Log("Playing timed audio: " + timedAudio.audioClip.name);
+
+                        if (audioMonitorCoroutine != null)
+                        {
+                            StopCoroutine(audioMonitorCoroutine);
+                        }
+                        audioMonitorCoroutine = StartCoroutine(MonitorAudioAndSwitchAnimation());
                     }
 
                     currentAudioIndex++;
@@ -476,6 +818,13 @@ public class IntroSceneController : MonoBehaviour
 
         Debug.Log("Video finished");
 
+        // Ensure bot returns to idle after video
+        if (idleAnimation != null && botAnimator != null)
+        {
+            botAnimator.Play("Idle");
+        }
+        isCurrentlyTalking = false;
+
         // Fade out video and disable light
         yield return StartCoroutine(FadeOutVideo());
 
@@ -484,6 +833,13 @@ public class IntroSceneController : MonoBehaviour
             videoLight.enabled = false;
         }
 
+        // Fade directional light OUT back to original intensity
+        if (directionalLight != null)
+        {
+            StartCoroutine(FadeDirectionalLight(directionalLight.intensity, dirLightOriginalIntensity, dirLightFadeDuration));
+        }
+
+
         yield return new WaitForSeconds(0.5f);
     }
 
@@ -491,22 +847,151 @@ public class IntroSceneController : MonoBehaviour
     {
         Debug.Log("Playing strand: " + strand.strandName);
 
-        // Play bot audio
+        // Play bot audio (this will wait for move and optional transition animation)
         yield return StartCoroutine(PlayBotAudio(strand.botAudio, strand.botPosition, strand.botAnimation));
 
-        // Play video with timed audio
+        // Play video with timed audio (timed audios will also wait for their transition animations)
         yield return StartCoroutine(PlayVideoWithTimedAudio(strand.video, strand.timedAudios));
     }
 
     IEnumerator PlayBotTalkWithVideo(BotTalkWithVideo sequence)
     {
-        Debug.Log("Playing bot talk with video sequence");
+        // Modified so the bot audio and the video start together.
+        Debug.Log("Playing bot talk with video sequence (concurrent audio+video)");
 
-        // Play bot audio
-        yield return StartCoroutine(PlayBotAudio(sequence.botAudio, sequence.botPosition, sequence.botAnimation));
+        if (sequence == null) yield break;
 
-        // Play video with timed audio
-        yield return StartCoroutine(PlayVideoWithTimedAudio(sequence.video, sequence.timedAudios));
+        // Move + optional transition first (to position the bot)
+        if (sequence.botPosition != null && botModel != null)
+        {
+            yield return StartCoroutine(MoveAndPlayTransition(sequence.botPosition, 1f, sequence.botAnimation));
+            botBasePosition = sequence.botPosition.position;
+        }
+        else if (sequence.botAnimation != null && botModel != null)
+        {
+            yield return StartCoroutine(MoveAndPlayTransition(botModel.transform, 0.01f, sequence.botAnimation));
+        }
+
+        // Prepare and clear RT to avoid last-frame flash
+        if (sequence.video != null && videoPlayer != null && videoCanvas != null)
+        {
+            videoCanvas.SetActive(true);
+            if (videoCanvasGroup != null) videoCanvasGroup.alpha = 0f;
+
+            ClearVideoRenderTexture();
+
+            videoPlayer.Stop();
+            videoPlayer.clip = sequence.video;
+            videoPlayer.playbackSpeed = 1f;
+            videoPlayer.isLooping = false;
+            videoPlayer.Prepare();
+
+            float prepareTimeout = 10f;
+            float prepareTimer = 0f;
+            while (!videoPlayer.isPrepared && prepareTimer < prepareTimeout)
+            {
+                prepareTimer += Time.deltaTime;
+                yield return null;
+            }
+
+            if (!videoPlayer.isPrepared)
+            {
+                Debug.LogError("Video failed to prepare!");
+                videoCanvas.SetActive(false);
+                yield break;
+            }
+
+            if (videoLight != null) videoLight.enabled = true;
+            yield return StartCoroutine(FadeInVideo());
+
+            // Start video
+            videoPlayer.Play();
+            Debug.Log("Video playing (sequence array): " + sequence.video.name);
+        }
+
+        // Start main bot audio at the same time as the video
+        if (sequence.botAudio != null && botAudioSource != null)
+        {
+            botAudioSource.PlayOneShot(sequence.botAudio);
+            if (audioMonitorCoroutine != null) StopCoroutine(audioMonitorCoroutine);
+            audioMonitorCoroutine = StartCoroutine(MonitorAudioAndSwitchAnimation());
+            Debug.Log("Playing bot audio (sequence array): " + sequence.botAudio.name);
+        }
+
+        // While the video plays, handle timed audios relative to videoPlayer.time (same logic as PlayVideoWithTimedAudio)
+        int currentAudioIndex = 0;
+        if (sequence.timedAudios != null && sequence.timedAudios.Length > 0 && videoPlayer != null)
+        {
+            while (videoPlayer.isPlaying)
+            {
+                double currentVideoTime = videoPlayer.time;
+
+                if (currentAudioIndex < sequence.timedAudios.Length)
+                {
+                    TimedAudioWithPosition timedAudio = sequence.timedAudios[currentAudioIndex];
+                    if (currentVideoTime >= timedAudio.timestamp)
+                    {
+                        if (timedAudio.botPosition != null && botModel != null)
+                        {
+                            if (timedAudio.botAnimation != null)
+                            {
+                                yield return StartCoroutine(MoveAndPlayTransition(timedAudio.botPosition, 0.5f, timedAudio.botAnimation));
+                            }
+                            else
+                            {
+                                yield return StartCoroutine(MoveAndPlayTransition(timedAudio.botPosition, 0.5f, null));
+                            }
+                            botBasePosition = timedAudio.botPosition.position;
+                        }
+                        else if (timedAudio.botAnimation != null && botModel != null)
+                        {
+                            yield return StartCoroutine(MoveAndPlayTransition(botModel.transform, 0.01f, timedAudio.botAnimation));
+                        }
+
+                        if (timedAudio.audioClip != null && botAudioSource != null)
+                        {
+                            botAudioSource.PlayOneShot(timedAudio.audioClip);
+                            if (audioMonitorCoroutine != null)
+                            {
+                                StopCoroutine(audioMonitorCoroutine);
+                            }
+                            audioMonitorCoroutine = StartCoroutine(MonitorAudioAndSwitchAnimation());
+                        }
+
+                        currentAudioIndex++;
+                    }
+                }
+
+                yield return null;
+            }
+        }
+        else
+        {
+            // If no timed audios, just wait until both video and main audio finish
+            bool isVideoPlaying() => sequence.video != null && videoPlayer != null && videoPlayer.isPlaying;
+            bool isAudioPlaying() => botAudioSource != null && botAudioSource.isPlaying;
+
+            while (isVideoPlaying() || isAudioPlaying())
+            {
+                yield return null;
+            }
+        }
+
+        // End of this sequence: make sure idle state
+        if (idleAnimation != null && botAnimator != null)
+        {
+            botAnimator.Play("Idle");
+        }
+        isCurrentlyTalking = false;
+
+        // Fade out video and disable light
+        if (sequence.video != null)
+        {
+            yield return StartCoroutine(FadeOutVideo());
+            if (videoLight != null) videoLight.enabled = false;
+        }
+
+        yield return new WaitForSeconds(0.25f);
     }
 
     IEnumerator FadeInVideo()
@@ -530,7 +1015,7 @@ public class IntroSceneController : MonoBehaviour
     {
         if (videoCanvasGroup == null)
         {
-            videoCanvas.SetActive(false);
+            if (videoCanvas != null) videoCanvas.SetActive(false);
             yield break;
         }
 
@@ -545,7 +1030,7 @@ public class IntroSceneController : MonoBehaviour
         }
 
         videoCanvasGroup.alpha = 0f;
-        videoCanvas.SetActive(false);
+        if (videoCanvas != null) videoCanvas.SetActive(false);
     }
 
     IEnumerator FadeToBlack()
@@ -564,7 +1049,7 @@ public class IntroSceneController : MonoBehaviour
 
     void OnGUI()
     {
-        if (fadeAlpha > 0f)
+        if (fadeAlpha > 0f && fadeTexture != null)
         {
             Color color = Color.black;
             color.a = fadeAlpha;
@@ -580,6 +1065,22 @@ public class IntroSceneController : MonoBehaviour
             videoPlayer.prepareCompleted -= OnVideoPrepared;
             videoPlayer.loopPointReached -= OnVideoFinished;
         }
+
+        if (audioMonitorCoroutine != null)
+        {
+            StopCoroutine(audioMonitorCoroutine);
+        }
+    }
+
+    // Helper: clear the assigned render texture so the last frame doesn't show.
+    void ClearVideoRenderTexture()
+    {
+        if (videoRenderTexture == null) return;
+
+        RenderTexture current = RenderTexture.active;
+        RenderTexture.active = videoRenderTexture;
+        GL.Clear(true, true, Color.black);
+        RenderTexture.active = current;
     }
 }
 
@@ -596,7 +1097,7 @@ public class TimedAudioWithPosition
     [Tooltip("Bot position during this audio")]
     public Transform botPosition;
 
-    [Tooltip("Bot animation during this audio")]
+    [Tooltip("Bot animation during this audio (Optional transition that will play BEFORE audio)")]
     public AnimationClip botAnimation;
 }
 
@@ -613,7 +1114,7 @@ public class StrandSequence
     [Tooltip("Bot position")]
     public Transform botPosition;
 
-    [Tooltip("Bot animation")]
+    [Tooltip("Bot animation (Optional transition that will play BEFORE audio)")]
     public AnimationClip botAnimation;
 
     [Tooltip("Video to play")]
@@ -633,7 +1134,7 @@ public class BotTalkWithVideo
     [Tooltip("Bot position")]
     public Transform botPosition;
 
-    [Tooltip("Bot animation")]
+    [Tooltip("Bot animation (Optional transition that will play BEFORE audio)")]
     public AnimationClip botAnimation;
 
     [Tooltip("Video to play")]
