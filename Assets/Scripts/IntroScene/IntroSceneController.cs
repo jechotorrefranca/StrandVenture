@@ -492,7 +492,7 @@ public class IntroSceneController : MonoBehaviour
         yield return StartCoroutine(FadeToBlack());
 
         Debug.Log("Intro sequence complete!");
-        SceneLoader.LoadSceneWithLoading("ExamScene");
+        SceneLoader.LoadSceneWithLoading("UserInfoScene");
 
     }
 

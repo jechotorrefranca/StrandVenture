@@ -2470,7 +2470,7 @@ MonoBehaviour:
   videoLightIntensity: 150
   lightOpeningSFX: {fileID: 8300000, guid: d8f69bbaf9e2d6b4987eac81cc71c495, type: 3}
   sfxAudioSource: {fileID: 257371410}
-  initialBotAudio: {fileID: 8300000, guid: 9a127c162461b0c4c81b137efa0f26da, type: 3}
+  initialBotAudio: {fileID: 8300000, guid: e83cfa9c02f301e45b67660423049389, type: 3}
   initialBotPosition: {fileID: 1728458979}
   initialBotAnimation: {fileID: 7400000, guid: d2cf6c35e1b26374483b1ca336a9f650, type: 2}
   firstVideo: {fileID: 32900000, guid: 66bbfd3abb5d5eb4c865f2d9d70127d9, type: 3}

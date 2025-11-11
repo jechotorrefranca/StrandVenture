@@ -212,7 +212,7 @@ public class DataPrivacyPanelController : MonoBehaviour
         isTransitioning = true;
 
         StopBotIfRunning();
-        StartCoroutine(FadeAndLoadScene("UserInfoScene"));
+        StartCoroutine(FadeAndLoadScene("IntroScene"));
     }
 
     private IEnumerator FadeAndLoadScene(string sceneName)
