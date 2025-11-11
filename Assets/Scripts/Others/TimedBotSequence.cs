@@ -19,7 +19,7 @@ public class TimedBotSequence : MonoBehaviour
     public GameObject mouthClosedMesh;
 
     [Header("Audio (for talking detection)")]
-    public AudioSource botAudioSource; // if null the script uses its own AudioSource
+    public AudioSource botAudioSource;
     [Range(0f, 0.5f)]
     public float audioThreshold = 0.01f;
     public float audioCheckInterval = 0.05f;
@@ -39,7 +39,6 @@ public class TimedBotSequence : MonoBehaviour
     [Tooltip("Default duration used when moving between positions if no animation length is available")]
     public float defaultMoveDuration = 0.8f;
 
-    [Header("Follow Player (rotation)")]
     [Tooltip("Assign the player's transform (camera or player root) for the bot to face")]
     [Header("Follow Player (rotation)")]
     public Transform playerTransform;
@@ -47,7 +46,6 @@ public class TimedBotSequence : MonoBehaviour
     public float lookAtSpeed = 6f;
     public bool allowFollowDuringMove = true;
 
-    // --- ADD THIS ---
     [Tooltip("Offset applied to the follow rotation in degrees (X = pitch, Y = yaw, Z = roll). " +
              "Use this if your model's rest pose looks tilted when aiming at the player.")]
     public Vector3 followRotationOffsetEuler = Vector3.zero;
@@ -56,23 +54,17 @@ public class TimedBotSequence : MonoBehaviour
     [Header("Timed Actions")]
     public TimedBotAction[] actions;
 
-
-
-    // internals
-    private AudioSource internalAudio; // fallback audio source
+    private AudioSource internalAudio;
     private Coroutine audioMonitorCoroutine;
     private bool isCurrentlyTalking = false;
     private float[] audioSamples = new float[256];
 
-    // fade (object-free)
-    private float fadeAlpha = 1f; // start fully black by default
+    private float fadeAlpha = 1f;
     private bool useGuiFade = true;
 
-    // floating / position
     private Vector3 botBasePosition;
     private float floatTimer;
 
-    // used to track Move coroutine so we can wait on it
     private Coroutine currentMoveCoroutine;
 
     void Reset()
@@ -100,7 +92,6 @@ public class TimedBotSequence : MonoBehaviour
             if (botAnimation != null)
                 botAnimation.cullingType = AnimationCullingType.AlwaysAnimate;
 
-            // Place bot at first action position (if available) to avoid visible teleport
             if (actions != null && actions.Length > 0 && actions[0] != null && actions[0].botPosition != null)
             {
                 botBasePosition = actions[0].botPosition.position;
@@ -122,10 +113,8 @@ public class TimedBotSequence : MonoBehaviour
 
     IEnumerator Start()
     {
-        // Start fully black overlay then fade to clear
         fadeAlpha = 1f;
 
-        // Ensure bot active + idle before fade so it's settled behind the black screen
         if (botModel != null)
         {
             botModel.SetActive(true);
@@ -138,16 +127,12 @@ public class TimedBotSequence : MonoBehaviour
             }
         }
 
-        // render one frame with bot in place
         yield return null;
 
-        // Fade out (black -> clear)
         yield return StartCoroutine(FadeOverlay(false));
 
-        // small initial delay
         yield return new WaitForSeconds(startDelay);
 
-        // Start floating (floating uses botBasePosition so it will follow moves)
         StartCoroutine(FloatBot());
 
         float sequenceStart = Time.time;
@@ -167,10 +152,8 @@ public class TimedBotSequence : MonoBehaviour
                 float waitFor = sequenceStart + action.timestamp - Time.time;
                 if (waitFor > 0f) yield return new WaitForSeconds(waitFor);
 
-                // Trigger the action - movement + animation will happen smoothly inside
                 StartCoroutine(PlayAction(action));
 
-                // compute expected end so we can wait before fade-out at the end
                 float clipLen = Mathf.Max(
                     action.audioClip != null ? action.audioClip.length : 0f,
                     action.animationClip != null ? action.animationClip.length : 0f
@@ -184,7 +167,6 @@ public class TimedBotSequence : MonoBehaviour
             if (remaining > 0f) yield return new WaitForSeconds(remaining + 3f);
         }
 
-        // Fade in to black and then optionally load next scene
         yield return StartCoroutine(FadeOverlay(true));
 
         if (!string.IsNullOrEmpty(sceneToLoadAfter))
@@ -195,11 +177,9 @@ public class TimedBotSequence : MonoBehaviour
     {
         if (action == null) yield break;
 
-        // Determine animation length and movement duration
         float animLen = action.animationClip != null ? action.animationClip.length : 0f;
         float moveDur = action.moveDuration > 0f ? action.moveDuration : (animLen > 0f ? animLen : defaultMoveDuration);
 
-        // Play animation (if any)
         if (action.animationClip != null && botAnimation != null)
         {
             string key = action.GetClipKey();
@@ -209,31 +189,24 @@ public class TimedBotSequence : MonoBehaviour
             botAnimation.CrossFade(key, 0.05f);
         }
 
-        // Start movement if there's a botPosition
         currentMoveCoroutine = null;
         if (action.botPosition != null && botModel != null)
         {
-            // If the action requests locking rotation during move, we will slerp to target rotation.
-            // Otherwise, if followPlayerRotation is enabled and allowed, we will NOT override rotation and let follow behavior handle it.
             bool respectRotation = action.lockRotationDuringMove || !followPlayerRotation || !allowFollowDuringMove;
             if (respectRotation)
             {
-                // move AND rotate toward action.botPosition over moveDur
                 currentMoveCoroutine = StartCoroutine(MoveAndRotate(botModel.transform.position, action.botPosition.position,
                                                                   botModel.transform.rotation, action.botPosition.rotation,
                                                                   moveDur));
             }
             else
             {
-                // move position only; do not change rotation (follow behavior will handle rotation)
                 currentMoveCoroutine = StartCoroutine(MovePositionOnly(botModel.transform.position, action.botPosition.position, moveDur));
             }
         }
 
-        // Wait for animation to finish (if present) OR wait for movement if no animation
         if (action.animationClip != null)
         {
-            // we use animation length; moveDur typically matches animLen by default
             yield return new WaitForSeconds(animLen);
         }
         else if (currentMoveCoroutine != null)
@@ -245,7 +218,6 @@ public class TimedBotSequence : MonoBehaviour
             yield return null;
         }
 
-        // Now animation/movement completed. Play audio if configured to start after animation
         if (action.audioClip != null && action.startAudioAfterAnimation && botAudioSource != null)
         {
             botAudioSource.PlayOneShot(action.audioClip);
@@ -273,7 +245,7 @@ public class TimedBotSequence : MonoBehaviour
 
             Vector3 current = Vector3.Lerp(fromPos, toPos, smoothT);
             botModel.transform.position = current;
-            botBasePosition = current; // keep floating anchored
+            botBasePosition = current;
             yield return null;
         }
 
@@ -317,29 +289,23 @@ public class TimedBotSequence : MonoBehaviour
         {
             if (botModel != null && botModel.activeSelf)
             {
-                // floating position
                 floatTimer += Time.deltaTime * globalFloatSpeed;
                 float yOffset = Mathf.Sin(floatTimer) * globalFloatAmplitude;
                 Vector3 floatTarget = botBasePosition + new Vector3(0f, yOffset, 0f);
                 botModel.transform.position = floatTarget;
 
-                // rotation follow: ONLY modify yaw so bot doesn't tilt (preserve X / Z) but apply inspector offset
                 if (followPlayerRotation && playerTransform != null)
                 {
-                    // allow follow while moving only if permitted
                     if (allowFollowDuringMove || currentMoveCoroutine == null)
                     {
-                        // direction to player, flattened on Y
                         Vector3 lookDir = playerTransform.position - botModel.transform.position;
                         lookDir.y = 0f;
 
                         if (lookDir.sqrMagnitude > 0.0001f)
                         {
-                            // compute yaw to face the player
                             Quaternion yawRot = Quaternion.LookRotation(lookDir.normalized, Vector3.up);
                             float targetYaw = yawRot.eulerAngles.y;
 
-                            // preserve current pitch and roll but apply the user offset
                             Vector3 currentEuler = botModel.transform.eulerAngles;
                             float targetPitch = currentEuler.x + followRotationOffsetEuler.x;
                             float targetRoll = currentEuler.z + followRotationOffsetEuler.z;
@@ -347,7 +313,6 @@ public class TimedBotSequence : MonoBehaviour
 
                             Quaternion target = Quaternion.Euler(targetPitch, targetYawWithOffset, targetRoll);
 
-                            // smooth yaw/preserved axes
                             botModel.transform.rotation = Quaternion.Slerp(botModel.transform.rotation, target, Time.deltaTime * lookAtSpeed);
                         }
                     }
