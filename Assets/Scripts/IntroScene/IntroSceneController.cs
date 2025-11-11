@@ -492,7 +492,8 @@ public class IntroSceneController : MonoBehaviour
         yield return StartCoroutine(FadeToBlack());
 
         Debug.Log("Intro sequence complete!");
-        // UnityEngine.SceneManagement.SceneManager.LoadScene("NextScene");
+        SceneLoader.LoadSceneWithLoading("ExamScene");
+
     }
 
     IEnumerator PlayBotAudio(AudioClip audio, Transform targetPosition, AnimationClip transitionAnimation)
