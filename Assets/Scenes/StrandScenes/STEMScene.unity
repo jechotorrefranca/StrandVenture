@@ -1167,21 +1167,21 @@ MonoBehaviour:
     moveDuration: 0
     startAudioAfterAnimation: 1
     lockRotationDuringMove: 0
-  - timestamp: 25
+  - timestamp: 1
     animationClip: {fileID: 7400000, guid: 0097bd58469975746b49386bbd3c8d67, type: 2}
     audioClip: {fileID: 8300000, guid: 0fb8bb0963a042d48bc52af4c28fe639, type: 3}
     botPosition: {fileID: 1393856973}
     moveDuration: 0
     startAudioAfterAnimation: 1
     lockRotationDuringMove: 0
-  - timestamp: 47
+  - timestamp: 2
     animationClip: {fileID: 7400000, guid: 312555e68ce8acd43a661a6ff1a61e0e, type: 2}
     audioClip: {fileID: 8300000, guid: 82b1c1cceb9f2be4ab56017472eb6689, type: 3}
     botPosition: {fileID: 2122099071}
     moveDuration: 0
     startAudioAfterAnimation: 1
     lockRotationDuringMove: 0
-  - timestamp: 66
+  - timestamp: 3
     animationClip: {fileID: 7400000, guid: 0097bd58469975746b49386bbd3c8d67, type: 2}
     audioClip: {fileID: 8300000, guid: 02d8f4d5d21f97e4b8cdb989f77bb110, type: 3}
     botPosition: {fileID: 832346059}
@@ -1726,7 +1726,8 @@ MonoBehaviour:
   finalBotAnimation: {fileID: 7400000, guid: ca92ad763fa30ce4f9e099230a2945d8, type: 2}
   finalBotAudio: {fileID: 8300000, guid: 0ffb2456f1242e94180db5c002fd6b13, type: 3}
   finalBotPosition: {fileID: 832346059}
-  nextSceneName: JobExpo
+  nextSceneName: JobExpoScene
+  debugPrompts: 0
 --- !u!4 &634386718
 Transform:
   m_ObjectHideFlags: 0
@@ -7909,7 +7910,7 @@ MonoBehaviour:
     type: 2}
   interactionAudio: {fileID: 8300000, guid: 9c703b64fbf6ca24d99b74d312088c26, type: 3}
   playerViewTransform: {fileID: 450327420}
-  infoText: Info about this item...
+  infoText: what even is this
   interactionPanelPrefab: {fileID: 922795844}
   glowRenderers: []
   glowColor: {r: 1, g: 0.6556604, b: 0.6556604, a: 1}
