@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.EventSystems; // << add this
 
 public class FirstPersonCameraMovement : MonoBehaviour
 {
@@ -19,6 +20,8 @@ public class FirstPersonCameraMovement : MonoBehaviour
 
     [Header("Control Settings")]
     public bool canLookAround = true;
+    public bool uiIsOpen = false;
+
 
     private Vector2 targetRotation;
     private Vector2 smoothedRotation;
@@ -31,14 +34,12 @@ public class FirstPersonCameraMovement : MonoBehaviour
 
     void Start()
     {
-        // Lock cursor if allowed at start
         if (canLookAround)
         {
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
         }
 
-        // Ensure a CharacterController exists (adds one if missing)
         controller = GetComponent<CharacterController>();
         if (controller == null)
         {
@@ -69,7 +70,6 @@ public class FirstPersonCameraMovement : MonoBehaviour
         }
         else
         {
-            // If movement disabled, keep the character grounded velocity small
             if (controller != null && controller.isGrounded)
                 verticalVelocity = -1f;
         }
@@ -100,7 +100,6 @@ public class FirstPersonCameraMovement : MonoBehaviour
     {
         if (controller == null) return;
 
-        // Read keyboard input (WASD + arrow keys)
         float forward = 0f;
         if (Keyboard.current.wKey.isPressed || Keyboard.current.upArrowKey.isPressed) forward += 1f;
         if (Keyboard.current.sKey.isPressed || Keyboard.current.downArrowKey.isPressed) forward -= 1f;
@@ -111,7 +110,6 @@ public class FirstPersonCameraMovement : MonoBehaviour
 
         Vector3 desired = Vector3.zero;
 
-        // Use camera yaw only (so looking up/down doesn't affect movement)
         Quaternion yawRotation = Quaternion.Euler(0f, transform.eulerAngles.y, 0f);
         Vector3 forwardDir = yawRotation * Vector3.forward;
         Vector3 rightDir = yawRotation * Vector3.right;
@@ -121,10 +119,9 @@ public class FirstPersonCameraMovement : MonoBehaviour
 
         Vector3 horizontalVelocity = desired * moveSpeed;
 
-        // Simple gravity
         if (controller.isGrounded)
         {
-            if (verticalVelocity < 0f) verticalVelocity = -1f; // small downward force to keep grounded
+            if (verticalVelocity < 0f) verticalVelocity = -1f;
         }
         else
         {
@@ -138,18 +135,35 @@ public class FirstPersonCameraMovement : MonoBehaviour
 
     private void HandleCursor()
     {
-        if (Keyboard.current.escapeKey.wasPressedThisFrame)
+        // If player can't look around (UI open / inspecting), don't auto-relock
+        if (!canLookAround)
+            return;
+
+        if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
         {
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
+            return;
         }
 
-        if (Mouse.current.leftButton.wasPressedThisFrame && Cursor.lockState == CursorLockMode.None)
+        // If pointer is over UI don't relock (prevents clicks on UI from hiding cursor)
+        bool pointerOverUI = false;
+        var es = EventSystem.current;
+        if (es != null)
+        {
+            // In editor and builds this will detect if pointer is over UI
+            pointerOverUI = es.IsPointerOverGameObject();
+        }
+
+        // Only relock when clicking and not clicking the UI
+        if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame
+            && Cursor.lockState == CursorLockMode.None && !pointerOverUI)
         {
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
         }
     }
+
 
     public void SetCanLookAround(bool canLook)
     {
@@ -167,12 +181,10 @@ public class FirstPersonCameraMovement : MonoBehaviour
         }
     }
 
-    // Use this if you want to enable/disable movement separately
     public void SetCanMove(bool canMove)
     {
         this.canMove = canMove;
 
-        // optionally unlock cursor when movement disabled (comment out if undesired)
         if (!canMove && !canLookAround)
         {
             Cursor.lockState = CursorLockMode.None;

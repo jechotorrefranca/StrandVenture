@@ -1,6 +1,9 @@
 using System.Collections;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.InputSystem;
+using TMPro;
 using UnityEngine.SceneManagement;
 
 [RequireComponent(typeof(AudioSource))]
@@ -29,31 +32,30 @@ public class TimedBotSequence : MonoBehaviour
     public float globalFloatSpeed = 1f;
 
     [Header("Sequence / Fade")]
-    [Tooltip("Duration for fade in/out (seconds)")]
     public float overlayFadeDuration = 0.8f;
     public float startDelay = 0.1f;
     public string sceneToLoadAfter = "";
     public float endPadding = 0.35f;
 
     [Header("Movement defaults")]
-    [Tooltip("Default duration used when moving between positions if no animation length is available")]
     public float defaultMoveDuration = 0.8f;
 
-    [Tooltip("Assign the player's transform (camera or player root) for the bot to face")]
     [Header("Follow Player (rotation)")]
     public Transform playerTransform;
     public bool followPlayerRotation = true;
     public float lookAtSpeed = 6f;
     public bool allowFollowDuringMove = true;
-
-    [Tooltip("Offset applied to the follow rotation in degrees (X = pitch, Y = yaw, Z = roll). " +
-             "Use this if your model's rest pose looks tilted when aiming at the player.")]
+    [Tooltip("Offset applied to the follow rotation in degrees (X = pitch, Y = yaw, Z = roll). ")]
     public Vector3 followRotationOffsetEuler = Vector3.zero;
-
 
     [Header("Timed Actions")]
     public TimedBotAction[] actions;
 
+    [Header("Integration")]
+    [Tooltip("If assigned the TimedBotSequence will call ActivateInteractables() at the end of the sequence instead of loading a scene")]
+    public InteractionManager interactionManager;
+
+    // internals
     private AudioSource internalAudio;
     private Coroutine audioMonitorCoroutine;
     private bool isCurrentlyTalking = false;
@@ -63,9 +65,11 @@ public class TimedBotSequence : MonoBehaviour
     private bool useGuiFade = true;
 
     private Vector3 botBasePosition;
+    private Quaternion botBaseRotation;
     private float floatTimer;
 
     private Coroutine currentMoveCoroutine;
+    private Coroutine currentActionCoroutine;
 
     void Reset()
     {
@@ -95,12 +99,14 @@ public class TimedBotSequence : MonoBehaviour
             if (actions != null && actions.Length > 0 && actions[0] != null && actions[0].botPosition != null)
             {
                 botBasePosition = actions[0].botPosition.position;
+                botBaseRotation = actions[0].botPosition.rotation;
                 botModel.transform.position = botBasePosition;
-                botModel.transform.rotation = actions[0].botPosition.rotation;
+                botModel.transform.rotation = botBaseRotation;
             }
             else
             {
                 botBasePosition = botModel.transform.position;
+                botBaseRotation = botModel.transform.rotation;
             }
         }
 
@@ -119,6 +125,7 @@ public class TimedBotSequence : MonoBehaviour
         {
             botModel.SetActive(true);
             botModel.transform.position = botBasePosition;
+            botModel.transform.rotation = botBaseRotation;
 
             if (botAnimation != null && idleAnimation != null)
             {
@@ -164,13 +171,82 @@ public class TimedBotSequence : MonoBehaviour
             }
 
             float remaining = (sequenceStart + sequenceExpectedEnd + endPadding) - Time.time;
-            if (remaining > 0f) yield return new WaitForSeconds(remaining + 3f);
+            if (remaining > 0f) yield return new WaitForSeconds(remaining);
         }
 
-        yield return StartCoroutine(FadeOverlay(true));
+        if (interactionManager != null)
+        {
+            interactionManager.ActivateInteractables();
+            yield break;
+        }
 
         if (!string.IsNullOrEmpty(sceneToLoadAfter))
+        {
+            yield return StartCoroutine(FadeOverlay(true));
             SceneManager.LoadScene(sceneToLoadAfter);
+        }
+    }
+
+    public void TriggerImmediateAction(TimedBotAction action)
+    {
+        if (action == null) return;
+        StartCoroutine(PlayAction(action));
+    }
+
+    public IEnumerator TriggerImmediateActionAndWait(TimedBotAction action)
+    {
+        if (action == null) yield break;
+
+        // Stop any current action
+        if (currentActionCoroutine != null)
+        {
+            StopCoroutine(currentActionCoroutine);
+            currentActionCoroutine = null;
+        }
+
+        if (currentMoveCoroutine != null)
+        {
+            StopCoroutine(currentMoveCoroutine);
+            currentMoveCoroutine = null;
+        }
+
+        if (audioMonitorCoroutine != null)
+        {
+            StopCoroutine(audioMonitorCoroutine);
+            audioMonitorCoroutine = null;
+        }
+
+        // Stop audio
+        if (botAudioSource != null && botAudioSource.isPlaying)
+        {
+            botAudioSource.Stop();
+        }
+
+        // Reset to idle
+        if (botAnimation != null && idleAnimation != null)
+        {
+            botAnimation.CrossFade("Idle", 0.1f);
+        }
+        SetMouthState(false);
+
+        // Play new action
+        currentActionCoroutine = StartCoroutine(PlayAction(action));
+        yield return currentActionCoroutine;
+        currentActionCoroutine = null;
+
+        // Wait for audio to finish
+        while (audioMonitorCoroutine != null)
+            yield return null;
+    }
+
+    public IEnumerator FadeToBlackAndLoad(string nextScene = null)
+    {
+        yield return StartCoroutine(FadeOverlay(true));
+        string sceneName = !string.IsNullOrEmpty(nextScene) ? nextScene : sceneToLoadAfter;
+        if (!string.IsNullOrEmpty(sceneName))
+        {
+            SceneManager.LoadScene(sceneName);
+        }
     }
 
     IEnumerator PlayAction(TimedBotAction action)
@@ -179,6 +255,13 @@ public class TimedBotSequence : MonoBehaviour
 
         float animLen = action.animationClip != null ? action.animationClip.length : 0f;
         float moveDur = action.moveDuration > 0f ? action.moveDuration : (animLen > 0f ? animLen : defaultMoveDuration);
+
+        if (action.audioClip != null && !action.startAudioAfterAnimation && botAudioSource != null)
+        {
+            botAudioSource.PlayOneShot(action.audioClip);
+            if (audioMonitorCoroutine != null) StopCoroutine(audioMonitorCoroutine);
+            audioMonitorCoroutine = StartCoroutine(MonitorAudioAndSwitchAnimation());
+        }
 
         if (action.animationClip != null && botAnimation != null)
         {
@@ -224,14 +307,6 @@ public class TimedBotSequence : MonoBehaviour
             if (audioMonitorCoroutine != null) StopCoroutine(audioMonitorCoroutine);
             audioMonitorCoroutine = StartCoroutine(MonitorAudioAndSwitchAnimation());
         }
-        else if (action.audioClip != null && !action.startAudioAfterAnimation && botAudioSource != null)
-        {
-            botAudioSource.PlayOneShot(action.audioClip);
-            if (audioMonitorCoroutine != null) StopCoroutine(audioMonitorCoroutine);
-            audioMonitorCoroutine = StartCoroutine(MonitorAudioAndSwitchAnimation());
-        }
-
-        yield break;
     }
 
     IEnumerator MovePositionOnly(Vector3 fromPos, Vector3 toPos, float duration)
@@ -258,6 +333,7 @@ public class TimedBotSequence : MonoBehaviour
         if (botModel == null)
         {
             botBasePosition = toPos;
+            botBaseRotation = toRot;
             yield break;
         }
 
@@ -274,6 +350,7 @@ public class TimedBotSequence : MonoBehaviour
             botModel.transform.position = current;
             botModel.transform.rotation = currentRot;
             botBasePosition = current;
+            botBaseRotation = currentRot;
 
             yield return null;
         }
@@ -281,6 +358,7 @@ public class TimedBotSequence : MonoBehaviour
         botModel.transform.position = toPos;
         botModel.transform.rotation = toRot;
         botBasePosition = toPos;
+        botBaseRotation = toRot;
     }
 
     IEnumerator FloatBot()
@@ -299,21 +377,14 @@ public class TimedBotSequence : MonoBehaviour
                     if (allowFollowDuringMove || currentMoveCoroutine == null)
                     {
                         Vector3 lookDir = playerTransform.position - botModel.transform.position;
-                        lookDir.y = 0f;
-
                         if (lookDir.sqrMagnitude > 0.0001f)
                         {
-                            Quaternion yawRot = Quaternion.LookRotation(lookDir.normalized, Vector3.up);
-                            float targetYaw = yawRot.eulerAngles.y;
-
-                            Vector3 currentEuler = botModel.transform.eulerAngles;
-                            float targetPitch = currentEuler.x + followRotationOffsetEuler.x;
-                            float targetRoll = currentEuler.z + followRotationOffsetEuler.z;
-                            float targetYawWithOffset = targetYaw + followRotationOffsetEuler.y;
-
-                            Quaternion target = Quaternion.Euler(targetPitch, targetYawWithOffset, targetRoll);
+                            Quaternion lookRot = Quaternion.LookRotation(lookDir.normalized, Vector3.up);
+                            Quaternion offset = Quaternion.Euler(followRotationOffsetEuler);
+                            Quaternion target = lookRot * offset;
 
                             botModel.transform.rotation = Quaternion.Slerp(botModel.transform.rotation, target, Time.deltaTime * lookAtSpeed);
+                            botBaseRotation = botModel.transform.rotation;
                         }
                     }
                 }
@@ -321,8 +392,6 @@ public class TimedBotSequence : MonoBehaviour
             yield return null;
         }
     }
-
-
 
     IEnumerator FadeOverlay(bool fadeToBlack)
     {
@@ -337,7 +406,6 @@ public class TimedBotSequence : MonoBehaviour
             yield return null;
         }
         fadeAlpha = endAlpha;
-        yield break;
     }
 
     void OnGUI()
@@ -444,23 +512,11 @@ public class TimedBotAction
 {
     [Tooltip("Seconds from sequence start when this action begins")]
     public float timestamp;
-
-    [Tooltip("Animation clip to play (legacy AnimationClip). If present, movement defaults to animation length")]
     public AnimationClip animationClip;
-
-    [Tooltip("Audio to play AFTER the animation/move completes (set startAudioAfterAnimation = false to play immediately)")]
     public AudioClip audioClip;
-
-    [Tooltip("Optional Transform to move the bot to before/during the animation")]
     public Transform botPosition;
-
-    [Tooltip("If > 0, forces the movement duration (in seconds). If 0, movement defaults to animation length or defaultMoveDuration")]
     public float moveDuration = 0f;
-
-    [Tooltip("If true (default) audio will start after animation/move completes")]
     public bool startAudioAfterAnimation = true;
-
-    [Tooltip("If true, the action will rotate the bot to the action's rotation while moving (ignores followPlayerRotation for that move)")]
     public bool lockRotationDuringMove = false;
 
     public string GetClipKey()
