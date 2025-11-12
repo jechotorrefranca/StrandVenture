@@ -41,30 +41,28 @@ public class InteractionManager : MonoBehaviour
     public Transform finalBotPosition;
     public string nextSceneName;
 
-    // internal
+    [Header("Debug")]
+    public bool debugPrompts = false;
+
     private InteractableItem currentLooked = null;
     private bool isActive = false;
     private int completedCount = 0;
     private bool isInspecting = false;
 
-    // Track current space sequence to allow interruption
     private Coroutine currentSpaceCoroutine = null;
     private InteractableItem currentSpaceItem = null;
 
-    // player restore states
     private Vector3 playerSavedPos;
     private Quaternion playerSavedRot;
     private CharacterController playerCC;
 
     private GameObject currentInfoUI;
 
-    // track if currentInfoUI is a scene object (not an instantiated prefab)
     private bool currentInfoUIIsSceneObject = false;
     private Transform currentInfoUIOriginalParent = null;
     private int currentInfoUIOriginalSibling = 0;
     private bool currentInfoUIOriginalActiveState = false;
 
-    // prompt coroutine
     private Coroutine promptCoroutine;
 
     void Start()
@@ -78,7 +76,6 @@ public class InteractionManager : MonoBehaviour
         if (promptCanvasGroup != null)
             promptCanvasGroup.alpha = 0f;
 
-        // Lock cursor for gameplay
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
 
@@ -93,7 +90,6 @@ public class InteractionManager : MonoBehaviour
         if (botSequence != null && botSequence.interactionManager == null)
             botSequence.interactionManager = this;
 
-        // auto-find UI root if not set (get RectTransform of first Canvas)
         if (uiRoot == null)
         {
             var c = FindObjectOfType<Canvas>();
@@ -127,35 +123,31 @@ public class InteractionManager : MonoBehaviour
 
         if (Physics.Raycast(r, out RaycastHit hit, gazeMaxDistance, interactableLayer))
         {
-            // Get the InteractableItem from the hit collider or its parents
             var item = hit.collider.GetComponent<InteractableItem>();
             if (item == null)
                 item = hit.collider.GetComponentInParent<InteractableItem>();
 
             if (item != null)
             {
-                if (currentLooked != item)
-                {
-                    currentLooked = item;
-                    UpdatePromptForItem(item);
-                }
+                InteractableItem previousLooked = currentLooked;
+                currentLooked = item;
+
+                UpdatePromptForItem(item);
 
                 if (Keyboard.current != null)
                 {
-                    // FIX: Allow space spam - will interrupt current sequence
-                    if (Keyboard.current.spaceKey.wasPressedThisFrame)
+                    if (Keyboard.current.qKey.wasPressedThisFrame)
                     {
-                        // Stop current space sequence if any
                         if (currentSpaceCoroutine != null)
                         {
                             StopCoroutine(currentSpaceCoroutine);
                             currentSpaceCoroutine = null;
+                            currentSpaceItem = null;
                         }
 
                         currentSpaceCoroutine = StartCoroutine(HandleSpaceForItem(item));
                     }
-                    // FIX: Only allow E if spaceDone AND item not yet inspected
-                    else if (Keyboard.current.eKey.wasPressedThisFrame && item.spaceDone && !item.inspected)
+                    else if (Keyboard.current.eKey.wasPressedThisFrame && item.spaceDone && !isInspecting)
                     {
                         StartCoroutine(HandleEForItem(item));
                     }
@@ -164,24 +156,36 @@ public class InteractionManager : MonoBehaviour
             }
         }
 
-        currentLooked = null;
-        HidePrompt();
+        if (currentLooked != null)
+        {
+            currentLooked = null;
+            HidePrompt();
+        }
     }
 
     void UpdatePromptForItem(InteractableItem item)
     {
-        // FIX: Don't show prompts for inspected items (but allow replaying bot sequence)
+        if (item == null) return;
+
+        string promptMsg = "";
+
         if (item.inspected)
         {
-            // After inspection, only show space prompt
-            ShowPrompt("Press <Space> to replay bot");
-            return;
+            if (item.spaceDone)
+                promptMsg = "Press <E> to inspect again\nPress <Space> to replay AXEL";
+            else
+                promptMsg = "Press <E> to inspect again\nPress <Space> to call AXEL";
+        }
+        else
+        {
+            if (item.spaceDone)
+                promptMsg = "Press <E> to inspect\n(Press <Space> again to replay AXEL)";
+            else
+                promptMsg = "Press <Q> to call bot";
         }
 
-        if (item.spaceDone)
-            ShowPrompt("Press <E> to inspect\n(Press <Space> again to replay bot)");
-        else
-            ShowPrompt("Press <Space> to call bot");
+        if (debugPrompts) Debug.Log($"[UpdatePrompt] {item.name}: inspected={item.inspected}, spaceDone={item.spaceDone} → \"{promptMsg}\"");
+        ShowPrompt(promptMsg);
     }
 
     void ShowPrompt(string text)
@@ -228,8 +232,27 @@ public class InteractionManager : MonoBehaviour
     {
         if (item == null) yield break;
 
+        if (currentSpaceCoroutine != null && currentSpaceItem != null && currentSpaceItem != item)
+        {
+            StopCoroutine(currentSpaceCoroutine);
+            currentSpaceCoroutine = null;
+            currentSpaceItem = null;
+        }
+
         currentSpaceItem = item;
         HidePrompt();
+
+        bool wasAlreadyCompleted = item.spaceDone;
+
+        if (!wasAlreadyCompleted)
+        {
+            item.spaceDone = false;
+            if (debugPrompts) Debug.Log($"[Space] Starting first-time interaction for {item.name}, set spaceDone=false");
+        }
+        else
+        {
+            if (debugPrompts) Debug.Log($"[Space] Replaying interaction for {item.name}, keeping spaceDone=true");
+        }
 
         TimedBotAction action = new TimedBotAction
         {
@@ -244,29 +267,22 @@ public class InteractionManager : MonoBehaviour
 
         if (botSequence != null)
         {
-            // Wait for the bot sequence to complete its move/animation
             yield return StartCoroutine(botSequence.TriggerImmediateActionAndWait(action));
-
-            // Wait for audio to complete if it exists
-            if (item.interactionAudio != null && item.interactionAudio.length > 0f)
-            {
-                float waitLen = Mathf.Clamp(item.interactionAudio.length, 0f, 60f);
-                yield return new WaitForSeconds(waitLen);
-            }
         }
 
-        // Mark that space sequence is done for this item
         item.spaceDone = true;
+        if (debugPrompts) Debug.Log($"[Space] Sequence finished for {item.name}, set spaceDone=true. CurrentLooked={(currentLooked != null ? currentLooked.name : "null")}");
 
-        // FIX: Update prompt for ALL items that might be looking at this one
-        // Not just if currentLooked == item, since player might look away during audio
-        if (!item.inspected)
+        yield return null;
+
+        if (currentLooked == item)
         {
-            // Force update the prompt if player is looking at any item
-            if (currentLooked != null)
-            {
-                UpdatePromptForItem(currentLooked);
-            }
+            if (debugPrompts) Debug.Log($"[Space] Player is looking at {item.name}, forcing prompt update");
+            UpdatePromptForItem(item);
+        }
+        else
+        {
+            if (debugPrompts) Debug.Log($"[Space] Player NOT looking at {item.name} (looking at {(currentLooked != null ? currentLooked.name : "nothing")}), prompt will update when they look back");
         }
 
         currentSpaceCoroutine = null;
@@ -275,20 +291,16 @@ public class InteractionManager : MonoBehaviour
 
     IEnumerator HandleEForItem(InteractableItem item)
     {
-        // don't open another panel if one is already active
         if (isInspecting) yield break;
 
-        // FIX: Check if item is already inspected to prevent duplicate processing
-        if (item == null || !item.spaceDone || item.inspected) yield break;
+        if (item == null || !item.spaceDone) yield break;
 
         isInspecting = true;
         HidePrompt();
 
-        // Unlock cursor for UI interaction
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
 
-        // Save player transform and disable movement
         Transform playerT = playerController.transform;
         playerSavedPos = playerT.position;
         playerSavedRot = playerT.rotation;
@@ -297,23 +309,19 @@ public class InteractionManager : MonoBehaviour
         playerController.SetCanLookAround(false);
         playerController.SetCanMove(false);
 
-        // Move player to view transform
         if (item.playerViewTransform != null)
         {
             playerT.position = item.playerViewTransform.position;
             playerT.rotation = item.playerViewTransform.rotation;
         }
 
-        // Instantiate or enable the panel under the UI root.
         GameObject prefabOrSceneObj = item.interactionPanelPrefab != null ? item.interactionPanelPrefab : infoUIPrefab;
 
         if (prefabOrSceneObj != null)
         {
-            // Reset any previous state trackers
             currentInfoUIIsSceneObject = false;
             currentInfoUIOriginalParent = null;
 
-            // Try to ensure uiRoot is set (fallback)
             if (uiRoot == null)
             {
                 var c = FindObjectOfType<Canvas>();
@@ -470,11 +478,9 @@ public class InteractionManager : MonoBehaviour
             currentInfoUIOriginalParent = null;
         }
 
-        // Lock cursor back for gameplay
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
 
-        // Restore player
         Transform playerT = playerController.transform;
         if (playerCC != null) playerCC.enabled = true;
         playerT.position = playerSavedPos;
@@ -484,25 +490,29 @@ public class InteractionManager : MonoBehaviour
 
         isInspecting = false;
 
-        // FIX: Only mark inspected and increment counter if not already inspected
         if (item != null && !item.inspected)
         {
             item.inspected = true;
-            item.StopHighlight(); // Stop the glow after inspection
+            item.StopHighlight();
             completedCount++;
 
-            // Check if all items are now inspected
             if (interactables != null && completedCount >= interactables.Length)
             {
                 DisableAllInteractables();
                 StartCoroutine(WaitThenPlayFinal());
             }
         }
+
+        if (currentLooked != null)
+            UpdatePromptForItem(currentLooked);
     }
 
     void DisableAllInteractables()
     {
         isActive = false;
+
+        HidePrompt();
+        currentLooked = null;
 
         if (interactables == null) return;
 
