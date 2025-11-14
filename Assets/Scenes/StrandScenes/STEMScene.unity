@@ -1167,21 +1167,21 @@ MonoBehaviour:
     moveDuration: 0
     startAudioAfterAnimation: 1
     lockRotationDuringMove: 0
-  - timestamp: 1
+  - timestamp: 24
     animationClip: {fileID: 7400000, guid: 0097bd58469975746b49386bbd3c8d67, type: 2}
     audioClip: {fileID: 8300000, guid: 0fb8bb0963a042d48bc52af4c28fe639, type: 3}
     botPosition: {fileID: 1393856973}
     moveDuration: 0
     startAudioAfterAnimation: 1
     lockRotationDuringMove: 0
-  - timestamp: 2
+  - timestamp: 46
     animationClip: {fileID: 7400000, guid: 312555e68ce8acd43a661a6ff1a61e0e, type: 2}
     audioClip: {fileID: 8300000, guid: 82b1c1cceb9f2be4ab56017472eb6689, type: 3}
     botPosition: {fileID: 2122099071}
     moveDuration: 0
     startAudioAfterAnimation: 1
     lockRotationDuringMove: 0
-  - timestamp: 3
+  - timestamp: 65
     animationClip: {fileID: 7400000, guid: 0097bd58469975746b49386bbd3c8d67, type: 2}
     audioClip: {fileID: 8300000, guid: 02d8f4d5d21f97e4b8cdb989f77bb110, type: 3}
     botPosition: {fileID: 832346059}

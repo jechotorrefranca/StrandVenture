@@ -27,7 +27,7 @@ EditorBuildSettings:
     path: Assets/Scenes/LoadingScene.unity
     guid: 96e8df08e872ff74fb3eb5d0344b979e
   - enabled: 1
-    path: Assets/Scenes/ChooseStrandScene.unity
+    path: Assets/Scenes/ChooseStrand.unity
     guid: b5b600787817b3c40a6002873393537b
   - enabled: 1
     path: Assets/Scenes/StrandScenes/ABMScene.unity
