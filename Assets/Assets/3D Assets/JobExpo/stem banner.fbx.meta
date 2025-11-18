@@ -1,9 +1,14 @@
 fileFormatVersion: 2
-guid: 9809a87a4c98a984ba5781ac5c1d8804
+guid: fd1269e273d34e74fbbc0008d95ab871
 ModelImporter:
   serializedVersion: 21300
   internalIDToNameTable: []
-  externalObjects: {}
+  externalObjects:
+  - first:
+      type: UnityEngine:Texture2D
+      assembly: UnityEngine.CoreModule
+      name: Beige Geometric Mega Deals Furniture Retractable Banner
+    second: {fileID: 2800000, guid: e401d84dcb8edbf4da49b33b7d2ef55e, type: 3}
   materials:
     materialImportMode: 2
     materialName: 0
@@ -92,11 +97,11 @@ ModelImporter:
     globalScale: 1
     rootMotionBoneName: 
     hasTranslationDoF: 0
-    hasExtraRoot: 1
+    hasExtraRoot: 0
     skeletonHasParents: 1
   lastHumanDescriptionAvatarSource: {instanceID: 0}
   autoGenerateAvatarMappingIfUnspecified: 1
-  animationType: 1
+  animationType: 2
   humanoidOversampling: 1
   avatarSetup: 0
   addHumanoidExtraRootOnlyWhenUsingAvatar: 1
