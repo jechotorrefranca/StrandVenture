@@ -11,15 +11,12 @@ using UnityEngine.InputSystem;
 using TMPro;
 using UnityEngine.EventSystems;
 
-/* * InteractableNPC.cs (Fixed - v2)
+/* * InteractableNPC.cs (Fixed - v3)
  * ------------------ 
- * Changes from previous version:
- * - Uses an explicit Camera reference (playerCamera) like your InteractionManager
- * - Uses a gaze layer mask and gazeMaxDistance for raycasts
- * - Accepts child colliders (GetComponentInParent / IsChildOf)
- * - Adds a Fade+Scale prompt routine copied from your InteractionManager
- * - Adds an optional LOS (obstruction) check using obstructionMask
- * - Ensures idle animation remains playing when not interacting
+ * - Greeting now plays a prepared AudioClip (assign in inspector as `greetingClip`) instead of Piper TTS
+ * - Clicking while the chat panel is open will refocus the input field so you can type again
+ * - Uses the legacy Animation component (public Animation `npcAnimation`) and plays AnimationClips directly
+ * - Keeps Groq/Piper reply flow intact (PlayPiperTTS used for replies)
  */
 public class InteractableNPC : MonoBehaviour
 {
@@ -49,7 +46,8 @@ public class InteractableNPC : MonoBehaviour
 
     [Header("Audio / TTS")]
     public AudioSource npcAudioSource;
-    public string voiceName = "en_US-hfc_male-medium";
+    public AudioClip greetingClip; // assign your prepared WAV here for the intro greeting
+    public string voiceName = "en_US-hfc_male-medium"; // used for Piper replies
 
     [Header("Groq/Piper config")]
     public string groqConfigFilename = "groq_config.json";
@@ -61,8 +59,9 @@ public class InteractableNPC : MonoBehaviour
     public GameObject playerRoot;
     public FirstPersonCameraMovement fpsController;
 
-    [Header("Animation Settings")]
-    public Animator npcAnimator;
+    [Header("Animation Settings - legacy Animation")]
+    [Tooltip("Assign an Animation component (legacy) that contains the clips, or leave null and the script will add clips at runtime.")]
+    public Animation npcAnimation; // legacy animation component
     public AnimationClip idleAnimationClip;
     public AnimationClip conversationAnimationClip;
     public float conversationIdleInterval = 3f; // seconds between switching to idle during conversation
@@ -132,6 +131,8 @@ public class InteractableNPC : MonoBehaviour
         if (panelCanvasGroup != null)
         {
             panelCanvasGroup.alpha = 0f;
+            panelCanvasGroup.interactable = false;
+            panelCanvasGroup.blocksRaycasts = false;
             if (panelRoot != null) panelRoot.SetActive(false);
         }
 
@@ -153,8 +154,29 @@ public class InteractableNPC : MonoBehaviour
         // Store initial rotation
         initialRotation = transform.rotation;
 
+        // Ensure Animation component exists if clips are used
+        if (npcAnimation == null && (idleAnimationClip != null || conversationAnimationClip != null))
+        {
+            // Try to get one from the same GameObject
+            npcAnimation = GetComponent<Animation>();
+            if (npcAnimation == null)
+            {
+                // create one so we can play legacy clips
+                npcAnimation = gameObject.AddComponent<Animation>();
+            }
+        }
+
+        // Add clips to the legacy Animation component so they can be played by name
+        if (npcAnimation != null)
+        {
+            if (idleAnimationClip != null && npcAnimation.GetClip(idleAnimationClip.name) == null)
+                npcAnimation.AddClip(idleAnimationClip, idleAnimationClip.name);
+            if (conversationAnimationClip != null && npcAnimation.GetClip(conversationAnimationClip.name) == null)
+                npcAnimation.AddClip(conversationAnimationClip, conversationAnimationClip.name);
+        }
+
         // Start idle animation (ensure it stays active when not interacting)
-        if (npcAnimator != null && idleAnimationClip != null)
+        if (npcAnimation != null && idleAnimationClip != null)
         {
             ForcePlayIdle();
         }
@@ -167,13 +189,12 @@ public class InteractableNPC : MonoBehaviour
         {
             HandlePlayerTracking();
 
-            // Ensure idle animation keeps playing while not in conversation
-            if (npcAnimator != null && idleAnimationClip != null)
+            // Ensure idle animation keeps playing while not in conversation (legacy Animation)
+            if (npcAnimation != null && idleAnimationClip != null)
             {
-                var state = npcAnimator.GetCurrentAnimatorStateInfo(0);
-                if (!state.IsName(idleAnimationClip.name))
+                if (!npcAnimation.IsPlaying(idleAnimationClip.name))
                 {
-                    npcAnimator.Play(idleAnimationClip.name);
+                    PlayAnimation(idleAnimationClip, true);
                 }
             }
         }
@@ -181,10 +202,21 @@ public class InteractableNPC : MonoBehaviour
         if (panelOpen)
         {
             // Allow quick exit with Q
-            if (Keyboard.current != null && Keyboard.current.qKey.wasPressedThisFrame)
+            if (Keyboard.current != null && Keyboard.current.tabKey.wasPressedThisFrame)
             {
                 StartCoroutine(CloseConversation());
             }
+
+            // If the panel is open and the player clicks the mouse, ensure the input field is selected
+            if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
+            {
+                if (playerInputField != null && EventSystem.current != null)
+                {
+                    EventSystem.current.SetSelectedGameObject(playerInputField.gameObject);
+                    playerInputField.ActivateInputField();
+                }
+            }
+
             return;
         }
 
@@ -323,9 +355,15 @@ public class InteractableNPC : MonoBehaviour
 
     private void PlayAnimation(AnimationClip clip, bool loop)
     {
-        if (npcAnimator != null && clip != null)
+        if (npcAnimation != null && clip != null)
         {
-            npcAnimator.Play(clip.name);
+            // ensure clip exists on the Animation component
+            if (npcAnimation.GetClip(clip.name) == null)
+                npcAnimation.AddClip(clip, clip.name);
+
+            var state = npcAnimation[clip.name];
+            state.wrapMode = loop ? WrapMode.Loop : WrapMode.Once;
+            npcAnimation.Play(clip.name);
         }
     }
 
@@ -356,15 +394,14 @@ public class InteractableNPC : MonoBehaviour
     private void ForcePlayIdle()
     {
         // Helper to force the idle animation on start / when restoring
-        if (npcAnimator == null || idleAnimationClip == null) return;
+        if (npcAnimation == null || idleAnimationClip == null) return;
         try
         {
-            npcAnimator.Play(idleAnimationClip.name);
+            PlayAnimation(idleAnimationClip, true);
         }
         catch (Exception)
         {
-            // If Play by name fails (Animator states don't match clip names), silently ignore —
-            // the user should ensure the Animator Controller has states named after the clips.
+            // If Play by name fails, ignore silently
         }
     }
 
@@ -398,14 +435,13 @@ public class InteractableNPC : MonoBehaviour
         // Move camera to focus point smoothly
         yield return StartCoroutine(MoveCameraToFocus());
 
-        // Play a short local greeting via TTS then open panel after audio finishes
-        string greeting = $"Hello, I am a {profession}. Ask me a question.";
-        yield return StartCoroutine(PlayPiperTTS(greeting)); // PlayPiperTTS already yields until audio finishes
+        // Play the prepared greeting AudioClip (user-assigned wav) instead of Piper TTS
+        yield return StartCoroutine(PlayGreetingClip());
 
         // Ensure EventSystem exists (so selection/focus works)
         EnsureEventSystemExists();
 
-        // Show chat panel only AFTER TTS finished
+        // Show chat panel only AFTER greeting finished
         if (panelRoot != null) panelRoot.SetActive(true);
 
         if (panelCanvasGroup != null)
@@ -426,7 +462,10 @@ public class InteractableNPC : MonoBehaviour
         {
             playerInputField.interactable = true;
             playerInputField.text = "";
-            EventSystem.current.SetSelectedGameObject(playerInputField.gameObject);
+            if (EventSystem.current != null)
+            {
+                EventSystem.current.SetSelectedGameObject(playerInputField.gameObject);
+            }
             playerInputField.ActivateInputField();
         }
 
@@ -436,6 +475,15 @@ public class InteractableNPC : MonoBehaviour
         if (statusText != null) statusText.text = "";
     }
 
+    private IEnumerator PlayGreetingClip()
+    {
+        if (npcAudioSource == null || greetingClip == null) yield break;
+
+        npcAudioSource.clip = greetingClip;
+        npcAudioSource.Play();
+        while (npcAudioSource.isPlaying)
+            yield return null;
+    }
 
     private IEnumerator CloseConversation()
     {
@@ -486,11 +534,7 @@ public class InteractableNPC : MonoBehaviour
 
         // Create a minimal EventSystem so UI selection and clicks work
         var go = new GameObject("EventSystem", new System.Type[] { typeof(EventSystem), typeof(StandaloneInputModule) });
-        // Optionally configure the module here. This works with the old UI input module
-        // If you're using the new Input System, you may prefer InputSystemUIInputModule (install package).
-        // For most projects StandaloneInputModule is fine.
     }
-
 
 
     #endregion
@@ -638,7 +682,7 @@ public class InteractableNPC : MonoBehaviour
         if (string.IsNullOrEmpty(reply))
             reply = "I'm sorry, I couldn't get an answer.";
 
-        // Play reply via Piper
+        // Play reply via Piper (this uses the Piper toolchain as before)
         yield return StartCoroutine(PlayPiperTTS(reply));
 
         // Re-enable input and UI
