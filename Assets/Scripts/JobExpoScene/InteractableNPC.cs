@@ -11,12 +11,12 @@ using UnityEngine.InputSystem;
 using TMPro;
 using UnityEngine.EventSystems;
 
-/* * InteractableNPC.cs (Fixed - v3)
+/* * InteractableNPC.cs (Fixed - v5)
  * ------------------ 
- * - Greeting now plays a prepared AudioClip (assign in inspector as `greetingClip`) instead of Piper TTS
- * - Clicking while the chat panel is open will refocus the input field so you can type again
- * - Uses the legacy Animation component (public Animation `npcAnimation`) and plays AnimationClips directly
- * - Keeps Groq/Piper reply flow intact (PlayPiperTTS used for replies)
+ * Fix: Ensure ONLY the active NPC plays audio by:
+ * 1. Stopping all audio on the AudioSource before playing new clips
+ * 2. Checking isInConversation flag before playing audio
+ * 3. Creating AudioSource dynamically if not assigned to ensure each NPC has its own
  */
 public class InteractableNPC : MonoBehaviour
 {
@@ -68,6 +68,9 @@ public class InteractableNPC : MonoBehaviour
     public float playerDetectionRange = 5f; // range to start following player
     public float rotationSpeed = 2f; // speed of Y-axis rotation
 
+    [Header("Crosshair")]
+    public GameObject crosshair; // will be hidden when interacting
+
     // Allow explicit camera assignment (matches your InteractionManager)
     [Header("Camera")]
     public Camera playerCamera;
@@ -98,6 +101,23 @@ public class InteractableNPC : MonoBehaviour
 
     void Start()
     {
+        // CRITICAL FIX: Ensure each NPC has its own AudioSource
+        if (npcAudioSource == null)
+        {
+            npcAudioSource = gameObject.AddComponent<AudioSource>();
+            npcAudioSource.playOnAwake = false;
+            npcAudioSource.spatialBlend = 1f; // 3D sound
+            npcAudioSource.minDistance = 1f;
+            npcAudioSource.maxDistance = 10f;
+            Debug.Log($"[{gameObject.name}] Created AudioSource dynamically");
+        }
+        else
+        {
+            // Ensure existing AudioSource is configured correctly
+            npcAudioSource.playOnAwake = false;
+            Debug.Log($"[{gameObject.name}] Using assigned AudioSource");
+        }
+
         // camera resolution: prefer explicit playerCamera (like your InteractionManager), fallback to Camera.main
         if (playerCamera == null && Camera.main != null)
             playerCamera = Camera.main;
@@ -181,6 +201,33 @@ public class InteractableNPC : MonoBehaviour
             ForcePlayIdle();
         }
     }
+
+    private void LoadGroqApiKey()
+    {
+        string path = Path.Combine(Application.streamingAssetsPath, groqConfigFilename);
+        if (File.Exists(path))
+        {
+            try
+            {
+                string json = File.ReadAllText(path);
+                var obj = JsonUtility.FromJson<SerializableKey>(json);
+                groqApiKey = obj.api_key;
+                Debug.Log("Loaded Groq key");
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("Failed load Groq key: " + e.Message);
+            }
+        }
+        else
+            Debug.LogWarning("groq_config.json not found at " + path);
+    }
+    private void InitializePiperPaths()
+    {
+        piperPath = Path.Combine(Application.streamingAssetsPath, piperRelativePath);
+        voicesDir = Path.Combine(Application.streamingAssetsPath, voicesRelativeDir);
+    }
+
 
     void Update()
     {
@@ -363,7 +410,8 @@ public class InteractableNPC : MonoBehaviour
 
             var state = npcAnimation[clip.name];
             state.wrapMode = loop ? WrapMode.Loop : WrapMode.Once;
-            npcAnimation.Play(clip.name);
+            // Use CrossFade for smoother transitions and to ensure the clip actually starts
+            npcAnimation.CrossFade(clip.name, 0.12f);
         }
     }
 
@@ -414,12 +462,17 @@ public class InteractableNPC : MonoBehaviour
         panelOpen = true;
         isInConversation = true;
 
+        Debug.Log($"[{gameObject.name}] Starting conversation");
+
         // Hide the prompt immediately when interaction starts
         if (playerLooking)
         {
             playerLooking = false;
             HidePrompt();
         }
+
+        // Hide crosshair
+        if (crosshair != null) crosshair.SetActive(false);
 
         // Disable player movement/look
         if (fpsController != null) fpsController.SetCanMove(false);
@@ -437,6 +490,13 @@ public class InteractableNPC : MonoBehaviour
 
         // Play the prepared greeting AudioClip (user-assigned wav) instead of Piper TTS
         yield return StartCoroutine(PlayGreetingClip());
+
+        // if the player cancelled during the greeting, don't continue to show the panel
+        if (!isInConversation)
+        {
+            Debug.Log($"[{gameObject.name}] Conversation cancelled during greeting");
+            yield break;
+        }
 
         // Ensure EventSystem exists (so selection/focus works)
         EnsureEventSystemExists();
@@ -479,16 +539,47 @@ public class InteractableNPC : MonoBehaviour
     {
         if (npcAudioSource == null || greetingClip == null) yield break;
 
+        // CRITICAL FIX: Stop any existing audio before playing
+        if (npcAudioSource.isPlaying)
+        {
+            Debug.Log($"[{gameObject.name}] Stopping existing audio before greeting");
+            npcAudioSource.Stop();
+        }
+
+        Debug.Log($"[{gameObject.name}] Playing greeting clip");
         npcAudioSource.clip = greetingClip;
         npcAudioSource.Play();
+
         while (npcAudioSource.isPlaying)
+        {
+            // allow cancellation while greeting plays
+            if (!isInConversation)
+            {
+                Debug.Log($"[{gameObject.name}] Greeting cancelled");
+                npcAudioSource.Stop();
+                yield break;
+            }
             yield return null;
+        }
+
+        Debug.Log($"[{gameObject.name}] Greeting finished");
     }
 
     private IEnumerator CloseConversation()
     {
-        // Stop conversation animation
+        Debug.Log($"[{gameObject.name}] Closing conversation");
+
+        // CRITICAL FIX: Stop any playing audio immediately
+        if (npcAudioSource != null && npcAudioSource.isPlaying)
+        {
+            Debug.Log($"[{gameObject.name}] Stopping audio on conversation close");
+            npcAudioSource.Stop();
+        }
+
+        // If panel not yet presented but greeting playing, cancel conversation state so BeginConversation exits early
         isInConversation = false;
+
+        // Stop conversation animation
         if (animationIntervalCoroutine != null)
         {
             StopCoroutine(animationIntervalCoroutine);
@@ -524,6 +615,9 @@ public class InteractableNPC : MonoBehaviour
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
 
+        // Show crosshair again
+        if (crosshair != null) crosshair.SetActive(true);
+
         if (fpsController != null) fpsController.SetCanMove(true);
         if (fpsController != null) fpsController.SetCanLookAround(true);
     }
@@ -535,7 +629,6 @@ public class InteractableNPC : MonoBehaviour
         // Create a minimal EventSystem so UI selection and clicks work
         var go = new GameObject("EventSystem", new System.Type[] { typeof(EventSystem), typeof(StandaloneInputModule) });
     }
-
 
     #endregion
 
@@ -648,7 +741,7 @@ public class InteractableNPC : MonoBehaviour
 
     #endregion
 
-    #region Send / Receive (unchanged)
+    #region Send / Receive (modified to use unique temp files)
 
     private void OnInputSubmit(string text)
     {
@@ -673,16 +766,25 @@ public class InteractableNPC : MonoBehaviour
 
     private IEnumerator ProcessPlayerMessage(string message)
     {
+        // CRITICAL: Check if still in conversation before processing
+        if (!isInConversation)
+        {
+            Debug.Log($"[{gameObject.name}] Not in conversation, ignoring message");
+            yield break;
+        }
+
+        Debug.Log($"[{gameObject.name}] Processing message: {message}");
+
         // Build concise system prompt
-        string system = $"You are a professional {profession}. Answer the player's question directly and concisely in 1-2 short sentences. If the question is not answerable, reply exactly: I can't answer that.";
+        string system = $"You are a professional {profession}. Answer the player's question directly and concisely in 1-2 short sentences. If the question is not appropriate, reply appropriately.";
 
         string reply = null;
         yield return StartCoroutine(SendGroqChat(system, message, r => reply = r));
 
         if (string.IsNullOrEmpty(reply))
-            reply = "I'm sorry, I couldn't get an answer.";
+            reply = "There is something with the code.";
 
-        // Play reply via Piper (this uses the Piper toolchain as before)
+        // Play reply via Piper (this uses the Piper toolchain). Use a unique temporary filename per NPC/call to avoid cross-talk
         yield return StartCoroutine(PlayPiperTTS(reply));
 
         // Re-enable input and UI
@@ -696,9 +798,130 @@ public class InteractableNPC : MonoBehaviour
         if (sendButton != null) sendButton.interactable = true;
     }
 
+    private IEnumerator PlayPiperTTS(string text)
+    {
+        // CRITICAL: Double-check we're still in conversation
+        if (!isInConversation)
+        {
+            Debug.Log($"[{gameObject.name}] Not in conversation, skipping TTS playback");
+            yield break;
+        }
+
+        if (npcAudioSource == null)
+        {
+            Debug.LogWarning($"[{gameObject.name}] No AudioSource assigned!");
+            yield break;
+        }
+
+        // CRITICAL FIX: Stop any existing audio before playing new clip
+        if (npcAudioSource.isPlaying)
+        {
+            Debug.Log($"[{gameObject.name}] Stopping existing audio before TTS");
+            npcAudioSource.Stop();
+        }
+
+        // Create a unique output path per call so multiple NPCs don't overwrite the same file
+        string filename = $"piper_output_{GetInstanceID()}_{DateTime.UtcNow.Ticks}.wav";
+        string outputPath = Path.Combine(Application.persistentDataPath, filename);
+
+        Debug.Log($"[{gameObject.name}] Generating TTS to: {outputPath}");
+
+        bool ok = false;
+
+        Task<bool> gen = Task.Run(() => GeneratePiperAudio(text, outputPath));
+        while (!gen.IsCompleted) yield return null;
+        ok = gen.Result;
+
+        if (!ok)
+        {
+            Debug.LogError($"[{gameObject.name}] Piper generation failed");
+            yield break;
+        }
+
+        // CRITICAL: Check again if still in conversation before loading/playing
+        if (!isInConversation)
+        {
+            Debug.Log($"[{gameObject.name}] Conversation ended before audio loaded, cleaning up");
+            TryDeleteSafe(outputPath);
+            yield break;
+        }
+
+        // Load audio
+        string uri = "file://" + outputPath;
+        using (UnityWebRequest www = UnityWebRequestMultimedia.GetAudioClip(uri, AudioType.WAV))
+        {
+            yield return www.SendWebRequest();
+
+#if UNITY_2020_1_OR_NEWER
+            if (www.result != UnityWebRequest.Result.Success)
+#else
+            if (www.isNetworkError || www.isHttpError)
+#endif
+            {
+                Debug.LogError($"[{gameObject.name}] Audio load error: " + www.error);
+                TryDeleteSafe(outputPath);
+                yield break;
+            }
+
+            AudioClip clip = DownloadHandlerAudioClip.GetContent(www);
+            if (clip == null)
+            {
+                Debug.LogError($"[{gameObject.name}] Failed to get audio clip");
+                TryDeleteSafe(outputPath);
+                yield break;
+            }
+
+            // CRITICAL: Final check before playing
+            if (!isInConversation)
+            {
+                Debug.Log($"[{gameObject.name}] Conversation ended before playback, cleaning up");
+                TryDeleteSafe(outputPath);
+                yield break;
+            }
+
+            Debug.Log($"[{gameObject.name}] Playing TTS audio");
+            npcAudioSource.clip = clip;
+            npcAudioSource.Play();
+
+            while (npcAudioSource.isPlaying && isInConversation)
+            {
+                yield return null;
+            }
+
+            // If conversation ended while playing, stop the audio
+            if (!isInConversation && npcAudioSource.isPlaying)
+            {
+                Debug.Log($"[{gameObject.name}] Conversation ended during playback, stopping");
+                npcAudioSource.Stop();
+            }
+
+            Debug.Log($"[{gameObject.name}] TTS playback finished");
+
+            // optionally delete the temp file after playback to avoid disk piling up
+            TryDeleteSafe(outputPath);
+        }
+    }
+
+    private void TryDeleteSafe(string path)
+    {
+        try
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[{gameObject.name}] Failed delete temp piper file: " + e.Message);
+        }
+    }
+
     #endregion
 
     #region Groq Chat Method (unchanged)
+
+    private class SerializableKey
+    {
+        public string api_key;
+    }
 
     [Serializable]
     private class GMessage
@@ -792,88 +1015,7 @@ public class InteractableNPC : MonoBehaviour
 
     #endregion
 
-    #region Piper TTS (unchanged)
-
-    private void LoadGroqApiKey()
-    {
-        string path = Path.Combine(Application.streamingAssetsPath, groqConfigFilename);
-        if (File.Exists(path))
-        {
-            try
-            {
-                string json = File.ReadAllText(path);
-                var obj = JsonUtility.FromJson<SerializableKey>(json);
-                groqApiKey = obj.api_key;
-                Debug.Log("Loaded Groq key");
-            }
-            catch (Exception e)
-            {
-                Debug.LogError("Failed load Groq key: " + e.Message);
-            }
-        }
-        else
-            Debug.LogWarning("groq_config.json not found at " + path);
-    }
-
-    [Serializable]
-    private class SerializableKey
-    {
-        public string api_key;
-    }
-
-    private void InitializePiperPaths()
-    {
-        piperPath = Path.Combine(Application.streamingAssetsPath, piperRelativePath);
-        voicesDir = Path.Combine(Application.streamingAssetsPath, voicesRelativeDir);
-    }
-
-    private IEnumerator PlayPiperTTS(string text)
-    {
-        if (npcAudioSource == null) yield break;
-
-        string outputPath = Path.Combine(Application.persistentDataPath, "piper_output.wav");
-        bool ok = false;
-
-        Task<bool> gen = Task.Run(() => GeneratePiperAudio(text, outputPath));
-        while (!gen.IsCompleted) yield return null;
-        ok = gen.Result;
-
-        if (!ok)
-        {
-            Debug.LogError("Piper generation failed");
-            yield break;
-        }
-
-        // Load audio
-        string uri = "file://" + outputPath;
-        using (UnityWebRequest www = UnityWebRequestMultimedia.GetAudioClip(uri, AudioType.WAV))
-        {
-            yield return www.SendWebRequest();
-
-#if UNITY_2020_1_OR_NEWER
-            if (www.result != UnityWebRequest.Result.Success)
-#else
-            if (www.isNetworkError || www.isHttpError)
-#endif
-            {
-                Debug.LogError("Audio load error: " + www.error);
-                yield break;
-            }
-
-            AudioClip clip = DownloadHandlerAudioClip.GetContent(www);
-            if (clip == null)
-            {
-                Debug.LogError("Failed to get audio clip");
-                yield break;
-            }
-
-            npcAudioSource.clip = clip;
-            npcAudioSource.Play();
-
-            while (npcAudioSource.isPlaying)
-                yield return null;
-        }
-    }
+    #region Piper TTS engine invocation (unchanged - writes to provided outputPath)
 
     private bool GeneratePiperAudio(string text, string outputPath)
     {
@@ -912,7 +1054,7 @@ public class InteractableNPC : MonoBehaviour
             }
 
             int attempts = 0;
-            while (!File.Exists(outputPath) && attempts < 50)
+            while (!File.Exists(outputPath) && attempts < 150)
             {
                 System.Threading.Thread.Sleep(100);
                 attempts++;
