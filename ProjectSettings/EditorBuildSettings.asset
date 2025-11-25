@@ -27,11 +27,14 @@ EditorBuildSettings:
     path: Assets/Scenes/LoadingScene.unity
     guid: 96e8df08e872ff74fb3eb5d0344b979e
   - enabled: 1
-    path: Assets/Scenes/ChooseStrand.unity
+    path: Assets/Scenes/ExploreMoreScene.unity
     guid: b5b600787817b3c40a6002873393537b
   - enabled: 1
     path: Assets/Scenes/StrandScenes/ABMScene.unity
     guid: b8feaaa0602140640b1833cb64780efa
+  - enabled: 1
+    path: Assets/Scenes/ExploreMoreScene.unity
+    guid: 118ca5a305a99f6449dd8d18a42f4385
   - enabled: 1
     path: Assets/Scenes/StrandScenes/HEScene.unity
     guid: cb88ba2e9c15e3e49a67aa49d0386908
@@ -50,6 +53,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/JobExpoScene.unity
     guid: f74b1a92e302cba46a2e6b2dff3263c5
+  - enabled: 1
+    path: Assets/Scenes/ChooseStrand.unity
+    guid: 33b071a2963e6934d9c73f903c96e63a
   m_configObjects:
     com.unity.input.settings: {fileID: 11400000, guid: 9e7be553448fa2546aea5752021cbcf7,
       type: 2}

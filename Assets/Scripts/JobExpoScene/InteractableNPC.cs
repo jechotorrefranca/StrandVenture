@@ -776,7 +776,7 @@ public class InteractableNPC : MonoBehaviour
         Debug.Log($"[{gameObject.name}] Processing message: {message}");
 
         // Build concise system prompt
-        string system = $"You are a professional {profession}. Answer the player's question directly and concisely in 1-2 short sentences. If the question is not appropriate, reply appropriately.";
+        string system = $"You are a professional {profession}, act like you are being interviewed. Answer the player's question directly and concisely in 1-2 short sentences. If the question is not appropriate, reply appropriately.";
 
         string reply = null;
         yield return StartCoroutine(SendGroqChat(system, message, r => reply = r));

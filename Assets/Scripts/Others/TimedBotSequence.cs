@@ -245,7 +245,7 @@ public class TimedBotSequence : MonoBehaviour
         string sceneName = !string.IsNullOrEmpty(nextScene) ? nextScene : sceneToLoadAfter;
         if (!string.IsNullOrEmpty(sceneName))
         {
-            SceneManager.LoadScene(sceneName);
+            SceneLoader.LoadSceneWithLoading(sceneName);
         }
     }
 

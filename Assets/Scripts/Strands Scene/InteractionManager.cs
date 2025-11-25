@@ -561,7 +561,7 @@ public class InteractionManager : MonoBehaviour
         {
             yield return new WaitForSeconds(1f);
             if (!string.IsNullOrEmpty(nextSceneName))
-                SceneManager.LoadScene(nextSceneName);
+                SceneLoader.LoadSceneWithLoading(nextSceneName);
         }
     }
 }

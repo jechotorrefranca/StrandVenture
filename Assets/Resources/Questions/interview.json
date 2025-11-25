@@ -1,0 +1,241 @@
+{
+  "sections": [
+    {
+      "title": "Part I: System Usability and User Experience (SOP 4)",
+      "questions": [
+        {
+          "id": "Q1",
+          "text": "How often did you experience technical issues (lag, crashes, difficulty navigating) while using the desktop simulation?",
+          "options": [
+            {
+              "choice": "A. Never. The system ran perfectly.",
+              "weight": 100
+            },
+            {
+              "choice": "B. Rarely (1-2 minor issues).",
+              "weight": 75
+            },
+            {
+              "choice": "C. Occasionally (The system was disruptive at times).",
+              "weight": 25
+            },
+            {
+              "choice": "D. Frequently (Significantly hindered the experience).",
+              "weight": 0
+            }
+          ]
+        },
+        {
+          "id": "Q2",
+          "text": "The visual design and user interface of StrandVenture made the exploration process easy and intuitive.",
+          "options": [
+            {
+              "choice": "A. Highly intuitive; I learned to use it instantly.",
+              "weight": 100
+            },
+            {
+              "choice": "B. Mostly intuitive; only minor difficulty at first.",
+              "weight": 75
+            },
+            {
+              "choice": "C. Somewhat confusing; required effort to figure out.",
+              "weight": 25
+            },
+            {
+              "choice": "D. Very confusing; the interface hindered my exploration.",
+              "weight": 0
+            }
+          ]
+        },
+        {
+          "id": "Q3",
+          "text": "How does StrandVenture compare to traditional counseling methods you have previously experienced?",
+          "options": [
+            {
+              "choice": "A. Much better (More personalized and informative).",
+              "weight": 100
+            },
+            {
+              "choice": "B. Slightly better (More engaging, but similar information).",
+              "weight": 75
+            },
+            {
+              "choice": "C. About the same (No major difference).",
+              "weight": 50
+            },
+            {
+              "choice": "D. Worse (Less helpful than face-to-face counseling).",
+              "weight": 0
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "title": "Part II: Engagement and Experiential Learning (SOP 3)",
+      "questions": [
+        {
+          "id": "Q4",
+          "text": "How accurately did the simulation reflect the real-world tasks of the recommended strand (e.g., lab work for STEM, accounting tasks for ABM)?",
+          "options": [
+            {
+              "choice": "A. Highly accurate; felt like a real experience.",
+              "weight": 100
+            },
+            {
+              "choice": "B. Mostly accurate, with a few minor unrealistic elements.",
+              "weight": 75
+            },
+            {
+              "choice": "C. Somewhat accurate, but lacked depth in key areas.",
+              "weight": 50
+            },
+            {
+              "choice": "D. Not accurate; felt generic and unrealistic.",
+              "weight": 0
+            }
+          ]
+        },
+        {
+          "id": "Q5",
+          "text": "The simulation environment (graphics, sound, interaction) felt immersive and helped me stay motivated.",
+          "options": [
+            {
+              "choice": "A. Highly immersive; I forgot I was on a desktop.",
+              "weight": 100
+            },
+            {
+              "choice": "B. Moderately immersive; kept me engaged.",
+              "weight": 75
+            },
+            {
+              "choice": "C. Slightly distracting; the environment was basic.",
+              "weight": 25
+            },
+            {
+              "choice": "D. Not immersive; it felt dull and did not help my learning.",
+              "weight": 0
+            }
+          ]
+        },
+        {
+          "id": "Q6",
+          "text": "How did the simulation impact your interest in the recommended academic strand?",
+          "options": [
+            {
+              "choice": "A. Greatly increased my interest and motivation.",
+              "weight": 100
+            },
+            {
+              "choice": "B. Slightly increased my interest.",
+              "weight": 75
+            },
+            {
+              "choice": "C. Did not change my level of interest.",
+              "weight": 50
+            },
+            {
+              "choice": "D. Decreased my interest.",
+              "weight": 0
+            }
+          ]
+        },
+        {
+          "id": "Q7",
+          "text": "Which aspect of the simulation was most helpful in your exploration?",
+          "options": [
+            {
+              "choice": "A. Strand Simulation",
+              "weight": 100
+            },
+            {
+              "choice": "B. Taking the exam",
+              "weight": 75
+            },
+            {
+              "choice": "C. Job Expo Simulation",
+              "weight": 25
+            },
+            {
+              "choice": "D. The Visualization of Recommendation/Feedback.",
+              "weight": 0
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "title": "Part III: Confidence and Recommendation Quality (SOP 4)",
+      "questions": [
+        {
+          "id": "Q8",
+          "text": "After the simulation, how confident are you in your final choice of academic strand?",
+          "options": [
+            {
+              "choice": "A. Extremely confident (Decision is clear and firm).",
+              "weight": 100
+            },
+            {
+              "choice": "B. Moderately confident (Slight doubts remain).",
+              "weight": 75
+            },
+            {
+              "choice": "C. Slightly confident (Still highly uncertain).",
+              "weight": 25
+            },
+            {
+              "choice": "D. Not confident at all (Need further guidance).",
+              "weight": 0
+            }
+          ]
+        },
+        {
+          "id": "Q9",
+          "text": "The recommendation provided by StrandVenture affirmed my understanding of my own strengths and weaknesses.",
+          "options": [
+            {
+              "choice": "A. Strongly affirmed my self-awareness.",
+              "weight": 100
+            },
+            {
+              "choice": "B. Somewhat affirmed my self-awareness.",
+              "weight": 75
+            },
+            {
+              "choice": "C. Neutral; provided no new insight into my abilities.",
+              "weight": 50
+            },
+            {
+              "choice": "D. Contradicted what I know about myself.",
+              "weight": 0
+            }
+          ]
+        },
+        {
+          "id": "Q10",
+          "text": "I would rely on the StrandVenture recommendation over guidance from peers or family members.",
+          "options": [
+            {
+              "choice": "A. Definitely rely on StrandVenture more.",
+              "weight": 100
+            },
+            {
+              "choice": "B. Would weigh both equally.",
+              "weight": 75
+            },
+            {
+              "choice": "C. Would rely on peers/family more.",
+              "weight": 25
+            },
+            {
+              "choice": "D. Would ignore the StrandVenture recommendation.",
+              "weight": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

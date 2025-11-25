@@ -1637,7 +1637,7 @@ VideoPlayer:
   m_TargetAudioSources:
   - {fileID: 0}
   m_DirectAudioVolumes:
-  - 0.2
+  - 1
   m_Url: 
   m_EnabledAudioTracks: 01
   m_DirectAudioMutes: 00
@@ -2473,7 +2473,7 @@ MonoBehaviour:
   initialBotAudio: {fileID: 8300000, guid: e83cfa9c02f301e45b67660423049389, type: 3}
   initialBotPosition: {fileID: 1728458979}
   initialBotAnimation: {fileID: 7400000, guid: d2cf6c35e1b26374483b1ca336a9f650, type: 2}
-  firstVideo: {fileID: 32900000, guid: 66bbfd3abb5d5eb4c865f2d9d70127d9, type: 3}
+  firstVideo: {fileID: 32900000, guid: abb7e3af1d02fc844a1e284c791876f6, type: 3}
   firstVideoAudios:
   - timestamp: 1
     audioClip: {fileID: 8300000, guid: 414a251720645ef47a1f74d2612a19fd, type: 3}
@@ -2500,19 +2500,9 @@ MonoBehaviour:
   strandSequences:
   - strandName: ABM
     botAudio: {fileID: 8300000, guid: 958049396f23b76498d38ee0f6a5715a, type: 3}
-    botPosition: {fileID: 389434184}
-    botAnimation: {fileID: 7400000, guid: 0097bd58469975746b49386bbd3c8d67, type: 2}
-    video: {fileID: 32900000, guid: 170bde9a2e142ba4baaf63c62f750400, type: 3}
-    timedAudios:
-    - timestamp: 0
-      audioClip: {fileID: 0}
-      botPosition: {fileID: 162231587}
-      botAnimation: {fileID: 7400000, guid: d2cf6c35e1b26374483b1ca336a9f650, type: 2}
-  - strandName: ICT
-    botAudio: {fileID: 8300000, guid: 1457c18f5d81f794b9722adf0fda97c5, type: 3}
-    botPosition: {fileID: 763259297}
+    botPosition: {fileID: 1728458979}
     botAnimation: {fileID: 7400000, guid: ca92ad763fa30ce4f9e099230a2945d8, type: 2}
-    video: {fileID: 32900000, guid: 2984dbd63f19b60418d9da50859e3116, type: 3}
+    video: {fileID: 32900000, guid: be3e13d02bf065c46a0bec0616ec9967, type: 3}
     timedAudios:
     - timestamp: 0
       audioClip: {fileID: 0}
@@ -2520,7 +2510,7 @@ MonoBehaviour:
       botAnimation: {fileID: 7400000, guid: d2cf6c35e1b26374483b1ca336a9f650, type: 2}
   - strandName: STEM
     botAudio: {fileID: 8300000, guid: f5a80ce49ce720641b45c50702e7cf4d, type: 3}
-    botPosition: {fileID: 389434184}
+    botPosition: {fileID: 1728458979}
     botAnimation: {fileID: 7400000, guid: ca92ad763fa30ce4f9e099230a2945d8, type: 2}
     video: {fileID: 32900000, guid: bae9ea161a43eaa4a8ed13dfcedf0b20, type: 3}
     timedAudios:
@@ -2539,12 +2529,17 @@ MonoBehaviour:
   - botAudio: {fileID: 8300000, guid: b9ae16ccc1985d146bc40d8cc601cd85, type: 3}
     botPosition: {fileID: 389434184}
     botAnimation: {fileID: 7400000, guid: 0097bd58469975746b49386bbd3c8d67, type: 2}
-    video: {fileID: 32900000, guid: fa7cf2a0d0ff2724c866516b851686a6, type: 3}
+    video: {fileID: 32900000, guid: eabf645dc04475643a9981f7b4f2b62a, type: 3}
     timedAudios: []
   - botAudio: {fileID: 8300000, guid: 7b5c4ff9d1328ee4e82e0cc90620bad4, type: 3}
     botPosition: {fileID: 763259297}
     botAnimation: {fileID: 7400000, guid: 312555e68ce8acd43a661a6ff1a61e0e, type: 2}
-    video: {fileID: 32900000, guid: fa7cf2a0d0ff2724c866516b851686a6, type: 3}
+    video: {fileID: 32900000, guid: 865bd7c6534420b43b8b271ed565d50a, type: 3}
+    timedAudios: []
+  - botAudio: {fileID: 8300000, guid: f5705b57966545342a1f51159d2b4355, type: 3}
+    botPosition: {fileID: 389434184}
+    botAnimation: {fileID: 7400000, guid: 0097bd58469975746b49386bbd3c8d67, type: 2}
+    video: {fileID: 32900000, guid: 594a29ecf754e414790e7409384cb1ba, type: 3}
     timedAudios: []
   finalBotAudio: {fileID: 8300000, guid: 1cc1ee416468c25418f096195ef5474f, type: 3}
   finalBotPosition: {fileID: 1728458979}

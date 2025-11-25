@@ -70,6 +70,10 @@ public class UserInfoSceneController : MonoBehaviour
 
     void Start()
     {
+        Cursor.visible = false;
+
+        StartCoroutine(DelayedStuff());
+        Cursor.visible = true;
         LoadGroqApiKey();
         InitializePiper();
 
@@ -101,6 +105,13 @@ public class UserInfoSceneController : MonoBehaviour
         saveButtonOriginalColor = saveButton.image.color;
 
         saveButton.onClick.AddListener(OnSaveButtonClicked);
+    }
+
+    IEnumerator DelayedStuff()
+    {
+        yield return new WaitForSeconds(0.5f);
+
+        // Continue here...
     }
 
     private void InitializePiper()

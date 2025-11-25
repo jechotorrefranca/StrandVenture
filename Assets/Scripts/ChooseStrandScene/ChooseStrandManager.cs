@@ -37,6 +37,7 @@ public class ChooseStrandManager : MonoBehaviour
     public Button leftButton;
     public Button rightButton;
     public Button selectButton;
+    public Button finishButton; // <-- NEW: finish button reference
     public TMP_Text descriptionText;
     public GameObject carouselContainer;
 
@@ -66,6 +67,7 @@ public class ChooseStrandManager : MonoBehaviour
 
     private void Start()
     {
+        Cursor.visible = true;
         if (!ValidateReferences())
         {
             Debug.LogError("ChooseStrandManager: Missing required references! Please assign all fields in the Inspector.");
@@ -96,6 +98,7 @@ public class ChooseStrandManager : MonoBehaviour
         if (leftButton != null) leftButton.interactable = false;
         if (rightButton != null) rightButton.interactable = false;
         if (selectButton != null) selectButton.interactable = false;
+        if (finishButton != null) finishButton.interactable = false; // initially disabled
 
         StartCoroutine(IntroSequence());
     }
@@ -256,6 +259,11 @@ public class ChooseStrandManager : MonoBehaviour
             selectButton.interactable = true;
             selectButton.onClick.AddListener(OnSelectClicked);
         }
+        if (finishButton != null)
+        {
+            finishButton.interactable = true;
+            finishButton.onClick.AddListener(OnFinishClicked); // <-- NEW: hook finish button
+        }
 
         introComplete = true;
     }
@@ -343,6 +351,9 @@ public class ChooseStrandManager : MonoBehaviour
         if (rightButton == null) { Debug.LogError("Right Button is not assigned!"); isValid = false; }
         if (selectButton == null) { Debug.LogError("Select Button is not assigned!"); isValid = false; }
         if (descriptionText == null) { Debug.LogError("Description Text is not assigned!"); isValid = false; }
+
+        // finishButton is optional but warn if missing
+        if (finishButton == null) { Debug.LogWarning("Finish Button is not assigned - 'Finish' option will be unavailable."); }
 
         if (carouselContainer == null) Debug.LogWarning("Carousel Container is not assigned - will hide individual cards instead");
         if (fadeOverlay == null) Debug.LogWarning("Fade Overlay is not assigned - intro animation will be skipped");
@@ -631,6 +642,7 @@ public class ChooseStrandManager : MonoBehaviour
         if (leftButton != null) leftButton.interactable = false;
         if (rightButton != null) rightButton.interactable = false;
         if (selectButton != null) selectButton.interactable = false;
+        if (finishButton != null) finishButton.interactable = false; // disable finish as well
 
         string selectedStrand = strands[currentIndex].name;
         string sceneName = selectedStrand + "Scene";
@@ -675,6 +687,68 @@ public class ChooseStrandManager : MonoBehaviour
             if (leftButton != null) leftButton.interactable = true;
             if (rightButton != null) rightButton.interactable = true;
             if (selectButton != null) selectButton.interactable = true;
+            if (finishButton != null) finishButton.interactable = true;
+
+            isAnimating = false;
+        }
+    }
+
+    // NEW: public handler for finish button
+    public void OnFinishClicked()
+    {
+        if (isAnimating) return;
+        StartCoroutine(FinishAndTransition());
+    }
+
+    // NEW: loads TitleScreen with fade, similar to SelectAndTransition
+    private IEnumerator FinishAndTransition()
+    {
+        isAnimating = true;
+
+        if (leftButton != null) leftButton.interactable = false;
+        if (rightButton != null) rightButton.interactable = false;
+        if (selectButton != null) selectButton.interactable = false;
+        if (finishButton != null) finishButton.interactable = false;
+
+        string sceneName = "TitleScreen";
+        Debug.Log($"Finish clicked. Loading Scene: {sceneName}");
+
+        if (fadeOverlay != null)
+        {
+            fadeOverlay.gameObject.SetActive(true);
+            float elapsed = 0f;
+            float fadeDuration = 0.5f;
+
+            while (elapsed < fadeDuration)
+            {
+                fadeOverlay.alpha = elapsed / fadeDuration;
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            fadeOverlay.alpha = 1f;
+        }
+
+        yield return new WaitForSeconds(0.2f);
+
+        if (Application.CanStreamedLevelBeLoaded(sceneName))
+        {
+            SceneLoader.LoadSceneWithLoading(sceneName);
+        }
+        else
+        {
+            Debug.LogError($"Scene '{sceneName}' not found in build settings! Please add it to File > Build Settings > Scenes in Build");
+
+            if (fadeOverlay != null)
+            {
+                fadeOverlay.alpha = 0f;
+                fadeOverlay.gameObject.SetActive(false);
+            }
+
+            if (leftButton != null) leftButton.interactable = true;
+            if (rightButton != null) rightButton.interactable = true;
+            if (selectButton != null) selectButton.interactable = true;
+            if (finishButton != null) finishButton.interactable = true;
 
             isAnimating = false;
         }
@@ -685,5 +759,6 @@ public class ChooseStrandManager : MonoBehaviour
         if (leftButton != null) leftButton.onClick.RemoveListener(ShowPrevious);
         if (rightButton != null) rightButton.onClick.RemoveListener(ShowNext);
         if (selectButton != null) selectButton.onClick.RemoveListener(OnSelectClicked);
+        if (finishButton != null) finishButton.onClick.RemoveListener(OnFinishClicked); // remove listener
     }
 }
