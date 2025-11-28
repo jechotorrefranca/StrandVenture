@@ -32,7 +32,7 @@ public class UserInfoSceneController : MonoBehaviour
     public Sprite idleSprite;
     public Sprite talkingSprite;
     public AudioSource botAudio;
-    public AudioClip botGoodbyeClip;
+    public AudioWithSubtitles botGoodbyeAudio; // optional goodbye audio + subtitles
     public float entranceDuration = 1f;
     public float floatAmplitude = 10f;
     public float floatSpeed = 1.5f;
@@ -64,16 +64,79 @@ public class UserInfoSceneController : MonoBehaviour
     private bool isNameValid = false;
     private bool isSectionValid = false;
 
-    [Header("Extra Audio Clips")]
-    public AudioClip errorClip;
-    public AudioClip getReadyClip;
+    [Header("Extra Audio Clips (with subtitles)")]
+    public AudioWithSubtitles errorAudio;     // audio + subtitle segments for error
+    public AudioWithSubtitles getReadyAudio;  // audio + subtitle segments for get-ready line
+
+    // ----------------------------------------------------------------------------
+    // Subtitle data types (array per audio, background color per segment)
+    [System.Serializable]
+    public class SubtitleSegment
+    {
+        [Tooltip("Timestamp in seconds when this subtitle should appear (relative to its audio clip start)")]
+        public float timestamp;
+
+        [TextArea(1, 4)]
+        [Tooltip("Subtitle text for this segment")]
+        public string text;
+
+        [Tooltip("Duration in seconds for this subtitle. 0 = auto (until next segment or clip end)")]
+        public float duration;
+
+        [Tooltip("Background color for this subtitle segment")]
+        public Color backgroundColor = new Color(0f, 0f, 0f, 0.8f);
+    }
+
+    [System.Serializable]
+    public class AudioWithSubtitles
+    {
+        [Tooltip("Audio clip to play")]
+        public AudioClip clip;
+
+        [Tooltip("Subtitle segments for this clip (can be multiple)")]
+        public SubtitleSegment[] segments;
+    }
+    // ----------------------------------------------------------------------------
+
+    [Header("Final Settings")]
+    [Tooltip("Duration of fade to black")]
+    public float fadeOutDuration = 2f;
+
+    [Tooltip("Duration of video fade in/out")]
+    public float videoFadeDuration = 0.5f;
+
+    private Texture2D fadeTexture;
+    private float fadeAlpha = 0f;
+
+    private Vector3 botBasePosition;
+    private float floatTimer = 0f;
+
+    private Animation botAnimator;
+
+    // single subtitle coroutine handle (used for both segmented and one-shot subtitles)
+    private Coroutine subtitleCoroutine = null;
+    private Coroutine currentVoiceCoroutine = null;
+
+    // Subtitles UI (shared background used for all segments; color changed per segment)
+    [Header("Subtitle UI")]
+    public GameObject subtitlePanel;      // panel that contains subtitle UI (assign in Inspector)
+    public Image subtitleBackground;      // shared background image for subtitles (assign in Inspector)
+    public TMP_Text subtitleText;         // TextMeshPro text for subtitle
+
+    // private helpers
+    private Coroutine botTalkCoroutine = null;
 
     void Start()
     {
-        Cursor.visible = false;
+        fadeTexture = new Texture2D(1, 1);
+        fadeTexture.SetPixel(0, 0, Color.black);
+        fadeTexture.Apply();
+
+        // Ensure cursor is visible & unlocked when this scene starts
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
 
         StartCoroutine(DelayedStuff());
-        Cursor.visible = true;
         LoadGroqApiKey();
         InitializePiper();
 
@@ -105,13 +168,21 @@ public class UserInfoSceneController : MonoBehaviour
         saveButtonOriginalColor = saveButton.image.color;
 
         saveButton.onClick.AddListener(OnSaveButtonClicked);
+
+        // Ensure subtitle panel hidden at start and background active (so color toggles work)
+        if (subtitlePanel != null)
+            subtitlePanel.SetActive(false);
+        if (subtitleBackground != null)
+        {
+            subtitleBackground.enabled = false;
+            subtitleBackground.gameObject.SetActive(false);
+        }
     }
 
     IEnumerator DelayedStuff()
     {
         yield return new WaitForSeconds(0.5f);
-
-        // Continue here...
+        // Placeholder for other delayed logic
     }
 
     private void InitializePiper()
@@ -158,6 +229,15 @@ public class UserInfoSceneController : MonoBehaviour
         saveButton.interactable = isNameValid && isSectionValid;
     }
 
+    // Keep cursor unlocked/visible each frame to counteract previous scene lock
+    void Update()
+    {
+        if (Cursor.lockState != CursorLockMode.None)
+            Cursor.lockState = CursorLockMode.None;
+        if (!Cursor.visible)
+            Cursor.visible = true;
+    }
+
     private IEnumerator SceneSequence()
     {
         yield return new WaitForSeconds(1f);
@@ -171,8 +251,20 @@ public class UserInfoSceneController : MonoBehaviour
         botContainer.SetActive(true);
         yield return StartCoroutine(BotEntranceAnimation());
 
-        botAudio.Play();
-        yield return StartCoroutine(BotTalkAnimation());
+        // If botGoodbyeAudio is assigned and contains an initial clip, play it with subtitles
+        if (botGoodbyeAudio != null && botGoodbyeAudio.clip != null)
+        {
+            yield return StartCoroutine(PlayAudioWithSubtitles(botGoodbyeAudio));
+        }
+        else
+        {
+            // Fallback: if botAudio.clip already assigned, play and animate
+            if (botAudio.clip != null)
+            {
+                botAudio.Play();
+                yield return StartCoroutine(BotTalkAnimation());
+            }
+        }
 
         yield return StartCoroutine(BotExitDownward());
 
@@ -214,14 +306,15 @@ public class UserInfoSceneController : MonoBehaviour
 
         string prompt = $"From this full name: '{fullName}', return only the most natural first name or nickname that a friend would use, don't change the name. In case of people having 2 first name like john adrian, return what would be the most common people would call them, like adrian.";
 
+        // Build request body in code (no inspector hierarchy)
         ChatRequest chatRequest = new ChatRequest
         {
             model = "openai/gpt-oss-120b",
             messages = new List<Message>
-        {
-            new Message { role = "system", content = "You are a precise name extractor that outputs only first names or nicknames." },
-            new Message { role = "user", content = prompt }
-        }
+            {
+                new Message { role = "system", content = "You are a precise name extractor that outputs only first names or nicknames." },
+                new Message { role = "user", content = prompt }
+            }
         };
 
         string requestBody = JsonUtility.ToJson(chatRequest);
@@ -244,8 +337,9 @@ public class UserInfoSceneController : MonoBehaviour
             {
                 Debug.Log("Groq Nickname Raw Response: " + request.downloadHandler.text);
 
+                // Attempt to parse minimal ChatResponse
                 ChatResponse response = JsonUtility.FromJson<ChatResponse>(request.downloadHandler.text);
-                if (response != null && response.choices.Length > 0)
+                if (response != null && response.choices != null && response.choices.Length > 0 && response.choices[0].message != null)
                 {
                     string nickname = response.choices[0].message.content.Trim();
 
@@ -253,6 +347,10 @@ public class UserInfoSceneController : MonoBehaviour
                     PlayerPrefs.Save();
 
                     Debug.Log("Saved Nickname: " + nickname);
+                }
+                else
+                {
+                    Debug.LogWarning("Groq response parsing failed or no choices.");
                 }
             }
         }
@@ -289,8 +387,30 @@ public class UserInfoSceneController : MonoBehaviour
                 botAudio.volume = ttsVolume;
                 botAudio.clip = clip;
                 botAudio.Play();
+
+                // show subtitle one-shot for the generated TTS
+                // use a neutral background color if you want (here we use semi-opaque black)
+                Color bg = new Color(0f, 0f, 0f, 0.8f);
+                // stop any existing subtitle coroutine and start one-shot
+                if (subtitleCoroutine != null)
+                {
+                    StopCoroutine(subtitleCoroutine);
+                    subtitleCoroutine = null;
+                }
+                subtitleCoroutine = StartCoroutine(SubtitleOneShotRoutine(text, clip.length, bg));
+
                 Debug.Log($"✅ Playing Piper TTS: {voiceName} at volume {ttsVolume}");
                 yield return StartCoroutine(BotTalkAnimation());
+
+                // ensure subtitle coroutine is cleared (in case it still running)
+                if (subtitleCoroutine != null)
+                {
+                    StopCoroutine(subtitleCoroutine);
+                    subtitleCoroutine = null;
+                    if (subtitlePanel != null) subtitlePanel.SetActive(false);
+                    if (subtitleBackground != null) { subtitleBackground.enabled = false; subtitleBackground.gameObject.SetActive(false); }
+                }
+
                 botAudio.volume = originalVolume;
                 onComplete?.Invoke(true);
             }
@@ -406,11 +526,10 @@ public class UserInfoSceneController : MonoBehaviour
 
         if (!ttsSuccess)
         {
-            if (errorClip != null)
+            // play errorAudio (AudioWithSubtitles) if set
+            if (errorAudio != null && errorAudio.clip != null)
             {
-                botAudio.clip = errorClip;
-                botAudio.Play();
-                yield return StartCoroutine(BotTalkAnimation());
+                yield return StartCoroutine(PlayAudioWithSubtitles(errorAudio));
             }
         }
         else
@@ -418,11 +537,9 @@ public class UserInfoSceneController : MonoBehaviour
             yield return new WaitForSeconds(0.3f);
         }
 
-        if (getReadyClip != null)
+        if (getReadyAudio != null && getReadyAudio.clip != null)
         {
-            botAudio.clip = getReadyClip;
-            botAudio.Play();
-            yield return StartCoroutine(BotTalkAnimation());
+            yield return StartCoroutine(PlayAudioWithSubtitles(getReadyAudio));
         }
 
         yield return new WaitForSeconds(0.5f);
@@ -611,6 +728,209 @@ public class UserInfoSceneController : MonoBehaviour
         }
     }
 
+    // ---------------------
+    // Play audio (regular clip) with multiple subtitle segments
+    // ---------------------
+    private IEnumerator PlayAudioWithSubtitles(AudioWithSubtitles aws)
+    {
+        if (aws == null || aws.clip == null)
+            yield break;
+
+        // Stop any existing voice coroutine
+        if (currentVoiceCoroutine != null)
+        {
+            StopCoroutine(currentVoiceCoroutine);
+            currentVoiceCoroutine = null;
+        }
+
+        // Stop previous audio/subtitle
+        if (botAudio.isPlaying)
+            botAudio.Stop();
+
+        StopSubtitleSequence();
+
+        botAudio.clip = aws.clip;
+        botAudio.Play();
+
+        // Start bot talk animation coroutine
+        botTalkCoroutine = StartCoroutine(BotTalkAnimation());
+
+        // Start subtitle segments if any
+        if (aws.segments != null && aws.segments.Length > 0)
+        {
+            if (subtitleCoroutine != null)
+            {
+                StopCoroutine(subtitleCoroutine);
+                subtitleCoroutine = null;
+            }
+            subtitleCoroutine = StartCoroutine(SubtitleSequenceCoroutine(aws.clip, aws.segments));
+        }
+
+        // Wait for clip end
+        while (botAudio != null && botAudio.isPlaying)
+            yield return null;
+
+        // Ensure we stop subtitle coroutine and bot animation
+        StopSubtitleSequence();
+
+        if (botTalkCoroutine != null)
+        {
+            StopCoroutine(botTalkCoroutine);
+            botTalkCoroutine = null;
+        }
+
+        botImage.sprite = idleSprite;
+    }
+
+    private void StopSubtitleSequence()
+    {
+        if (subtitleCoroutine != null)
+        {
+            StopCoroutine(subtitleCoroutine);
+            subtitleCoroutine = null;
+        }
+        if (subtitlePanel != null)
+            subtitlePanel.SetActive(false);
+        if (subtitleBackground != null)
+        {
+            subtitleBackground.enabled = false;
+            subtitleBackground.gameObject.SetActive(false);
+        }
+    }
+
+    // Show subtitle segments using timestamps and background color per segment
+    private IEnumerator SubtitleSequenceCoroutine(AudioClip clip, SubtitleSegment[] segments)
+    {
+        if (clip == null || segments == null || segments.Length == 0)
+            yield break;
+
+        System.Array.Sort(segments, (a, b) => a.timestamp.CompareTo(b.timestamp));
+
+        int idx = 0;
+        float clipLength = clip.length;
+
+        while (idx < segments.Length && botAudio != null && botAudio.isPlaying)
+        {
+            float currentTime = botAudio.time;
+            SubtitleSegment seg = segments[idx];
+
+            if (currentTime + 0.0001f >= seg.timestamp)
+            {
+                // Determine duration
+                float segDuration = seg.duration;
+                if (segDuration <= 0f)
+                {
+                    if (idx + 1 < segments.Length) segDuration = Mathf.Max(0.02f, segments[idx + 1].timestamp - seg.timestamp);
+                    else segDuration = Mathf.Max(0.02f, clipLength - seg.timestamp);
+                }
+
+                // show subtitle UI and set background color
+                if (subtitlePanel != null)
+                    subtitlePanel.SetActive(true);
+
+                if (subtitleText != null)
+                    subtitleText.text = seg.text ?? "";
+
+                if (subtitleBackground != null)
+                {
+                    // ensure background is enabled and visible
+                    subtitleBackground.enabled = true;
+                    subtitleBackground.gameObject.SetActive(true);
+
+                    Color col = seg.backgroundColor;
+                    // Avoid completely transparent backgrounds by forcing alpha if user accidentally set it to 0
+                    if (col.a <= 0.01f) col.a = 0.85f;
+                    subtitleBackground.color = col;
+                }
+
+                float waited = 0f;
+                while (waited < segDuration && botAudio != null && botAudio.isPlaying)
+                {
+                    waited += Time.deltaTime;
+                    yield return null;
+                }
+
+                // hide subtitle before next
+                if (subtitlePanel != null)
+                    subtitlePanel.SetActive(false);
+
+                // also disable background to keep consistent state
+                if (subtitleBackground != null)
+                {
+                    subtitleBackground.enabled = false;
+                    subtitleBackground.gameObject.SetActive(false);
+                }
+
+                idx++;
+            }
+            else
+            {
+                yield return null;
+            }
+        }
+
+        // ensure hidden
+        if (subtitlePanel != null)
+            subtitlePanel.SetActive(false);
+        if (subtitleBackground != null)
+        {
+            subtitleBackground.enabled = false;
+            subtitleBackground.gameObject.SetActive(false);
+        }
+
+        subtitleCoroutine = null;
+    }
+
+    // One-shot subtitle routine (used for TTS lines)
+    private IEnumerator SubtitleOneShotRoutine(string text, float duration, Color bgColor)
+    {
+        if (subtitlePanel != null)
+            subtitlePanel.SetActive(true);
+
+        if (subtitleText != null)
+            subtitleText.text = text ?? "";
+
+        if (subtitleBackground != null)
+        {
+            subtitleBackground.enabled = true;
+            subtitleBackground.gameObject.SetActive(true);
+            Color col = bgColor;
+            if (col.a <= 0.01f) col.a = 0.85f;
+            subtitleBackground.color = col;
+        }
+
+        float elapsed = 0f;
+        while (elapsed < duration && botAudio != null && botAudio.isPlaying)
+        {
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        if (subtitlePanel != null)
+            subtitlePanel.SetActive(false);
+        if (subtitleBackground != null)
+        {
+            subtitleBackground.enabled = false;
+            subtitleBackground.gameObject.SetActive(false);
+        }
+
+        subtitleCoroutine = null;
+    }
+
+    void OnDestroy()
+    {
+        if (botTalkCoroutine != null)
+        {
+            StopCoroutine(botTalkCoroutine);
+            botTalkCoroutine = null;
+        }
+
+        StopSubtitleSequence();
+    }
+
+    // ---------------------
+    // Minimal data types for Groq response parsing (kept at bottom)
+    // ---------------------
     [System.Serializable]
     public class Message
     {
