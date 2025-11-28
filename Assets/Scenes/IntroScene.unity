@@ -3473,7 +3473,7 @@ MonoBehaviour:
   skipFillImage: {fileID: 726075763}
   skipDelay: 2.5
   skipVisibleAlpha: 0.6
-  skipHoldDuration: 1
+  skipHoldDuration: 1.5
 --- !u!4 &2098528363
 Transform:
   m_ObjectHideFlags: 0
