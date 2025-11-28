@@ -1160,6 +1160,155 @@ Transform:
   m_Father: {fileID: 1769003279}
   m_RootOrder: 3
   m_LocalEulerAnglesHint: {x: -88.2, y: 180, z: 0}
+--- !u!1 &726075762
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 726075765}
+  - component: {fileID: 726075764}
+  - component: {fileID: 726075763}
+  m_Layer: 5
+  m_Name: SkipImage
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &726075763
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 726075762}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 21300000, guid: 65f390053d9786c458614729419364f7, type: 3}
+  m_Type: 3
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 0
+  m_FillClockwise: 1
+  m_FillOrigin: 2
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!222 &726075764
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 726075762}
+  m_CullTransparentMesh: 1
+--- !u!224 &726075765
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 726075762}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0.72, y: 0.72, z: 0.72}
+  m_ConstrainProportionsScale: 1
+  m_Children: []
+  m_Father: {fileID: 1539523515}
+  m_RootOrder: 1
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!1 &742083908
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 742083909}
+  - component: {fileID: 742083911}
+  - component: {fileID: 742083910}
+  m_Layer: 5
+  m_Name: SubBG
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!224 &742083909
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 742083908}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 810847247}
+  m_RootOrder: 0
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 1819.72, y: 58.37}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &742083910
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 742083908}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1344c3c82d62a2a41a3576d8abb8e3ea, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Material: {fileID: 0}
+  m_Color: {r: 0, g: 0, b: 0, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Texture: {fileID: 2800000, guid: 15393ebb190309c448f9b0cd9df63bb4, type: 3}
+  m_UVRect:
+    serializedVersion: 2
+    x: 0
+    y: 0
+    width: 1
+    height: 1
+--- !u!222 &742083911
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 742083908}
+  m_CullTransparentMesh: 1
 --- !u!1 &759089900
 GameObject:
   m_ObjectHideFlags: 0
@@ -1290,6 +1439,58 @@ Transform:
   m_Father: {fileID: 1769003279}
   m_RootOrder: 1
   m_LocalEulerAnglesHint: {x: -83, y: 140.1, z: 3.25}
+--- !u!1 &810847246
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 810847247}
+  - component: {fileID: 810847248}
+  m_Layer: 5
+  m_Name: Subtitle
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!224 &810847247
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 810847246}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 742083909}
+  - {fileID: 2020910115}
+  - {fileID: 1592909451}
+  m_Father: {fileID: 1903539542}
+  m_RootOrder: 1
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: -451.54}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!225 &810847248
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 810847246}
+  m_Enabled: 1
+  m_Alpha: 1
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0
 --- !u!1 &878700866
 GameObject:
   m_ObjectHideFlags: 0
@@ -1842,6 +2043,142 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1172710588}
   m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1251734588
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1251734589}
+  - component: {fileID: 1251734591}
+  - component: {fileID: 1251734590}
+  m_Layer: 5
+  m_Name: SkipText
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1251734589
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1251734588}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1539523515}
+  m_RootOrder: 0
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 200, y: 50}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1251734590
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1251734588}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_text: '{Space] to Skip'
+  m_isRightToLeft: 0
+  m_fontAsset: {fileID: 11400000, guid: ea5a62bb74d16a049815f5b119809384, type: 2}
+  m_sharedMaterial: {fileID: 8437622273908661436, guid: ea5a62bb74d16a049815f5b119809384,
+    type: 2}
+  m_fontSharedMaterials: []
+  m_fontMaterial: {fileID: 0}
+  m_fontMaterials: []
+  m_fontColor32:
+    serializedVersion: 2
+    rgba: 4294967295
+  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
+  m_enableVertexGradient: 0
+  m_colorMode: 3
+  m_fontColorGradient:
+    topLeft: {r: 1, g: 1, b: 1, a: 1}
+    topRight: {r: 1, g: 1, b: 1, a: 1}
+    bottomLeft: {r: 1, g: 1, b: 1, a: 1}
+    bottomRight: {r: 1, g: 1, b: 1, a: 1}
+  m_fontColorGradientPreset: {fileID: 0}
+  m_spriteAsset: {fileID: 0}
+  m_tintAllSprites: 0
+  m_StyleSheet: {fileID: 0}
+  m_TextStyleHashCode: -1183493901
+  m_overrideHtmlColors: 0
+  m_faceColor:
+    serializedVersion: 2
+    rgba: 4294967295
+  m_fontSize: 36
+  m_fontSizeBase: 36
+  m_fontWeight: 400
+  m_enableAutoSizing: 0
+  m_fontSizeMin: 18
+  m_fontSizeMax: 72
+  m_fontStyle: 0
+  m_HorizontalAlignment: 2
+  m_VerticalAlignment: 512
+  m_textAlignment: 65535
+  m_characterSpacing: 0
+  m_wordSpacing: 0
+  m_lineSpacing: 0
+  m_lineSpacingMax: 0
+  m_paragraphSpacing: 0
+  m_charWidthMaxAdj: 0
+  m_enableWordWrapping: 1
+  m_wordWrappingRatios: 0.4
+  m_overflowMode: 0
+  m_linkedTextComponent: {fileID: 0}
+  parentLinkedComponent: {fileID: 0}
+  m_enableKerning: 1
+  m_enableExtraPadding: 0
+  checkPaddingRequired: 0
+  m_isRichText: 1
+  m_parseCtrlCharacters: 1
+  m_isOrthographic: 1
+  m_isCullingEnabled: 0
+  m_horizontalMapping: 0
+  m_verticalMapping: 0
+  m_uvLineOffset: 0
+  m_geometrySortingOrder: 0
+  m_IsTextObjectScaleStatic: 0
+  m_VertexBufferAutoSizeReduction: 0
+  m_useMaxVisibleDescender: 1
+  m_pageToDisplay: 1
+  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_isUsingLegacyAnimationComponent: 0
+  m_isVolumetricText: 0
+  m_hasFontAssetChanged: 0
+  m_baseMaterial: {fileID: 0}
+  m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!222 &1251734591
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1251734588}
+  m_CullTransparentMesh: 1
 --- !u!1001 &1337050672
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2122,6 +2459,263 @@ Light:
   m_UseViewFrustumForShadowCasterCull: 1
   m_ShadowRadius: 0
   m_ShadowAngle: 0
+--- !u!1 &1539523514
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1539523515}
+  - component: {fileID: 1539523517}
+  - component: {fileID: 1539523516}
+  - component: {fileID: 1539523519}
+  - component: {fileID: 1539523518}
+  m_Layer: 5
+  m_Name: Skip
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1539523515
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1539523514}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1251734589}
+  - {fileID: 726075765}
+  m_Father: {fileID: 1903539542}
+  m_RootOrder: 0
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 793.49, y: 447.3}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1539523516
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1539523514}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 0}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 10907, guid: 0000000000000000f000000000000000, type: 0}
+  m_Type: 1
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!222 &1539523517
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1539523514}
+  m_CullTransparentMesh: 1
+--- !u!114 &1539523518
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1539523514}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3245ec927659c4140ac4f8d17403cc18, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_HorizontalFit: 2
+  m_VerticalFit: 2
+--- !u!114 &1539523519
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1539523514}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 30649d3a9faa99c48a7b1166b86bf2a0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Padding:
+    m_Left: 0
+    m_Right: 0
+    m_Top: 0
+    m_Bottom: 0
+  m_ChildAlignment: 4
+  m_Spacing: -23.69
+  m_ChildForceExpandWidth: 1
+  m_ChildForceExpandHeight: 1
+  m_ChildControlWidth: 0
+  m_ChildControlHeight: 0
+  m_ChildScaleWidth: 0
+  m_ChildScaleHeight: 0
+  m_ReverseArrangement: 0
+--- !u!1 &1592909450
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1592909451}
+  - component: {fileID: 1592909452}
+  - component: {fileID: 1592909453}
+  m_Layer: 5
+  m_Name: SubtitleText
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1592909451
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1592909450}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 810847247}
+  m_RootOrder: 2
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 2245.8, y: 50}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!222 &1592909452
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1592909450}
+  m_CullTransparentMesh: 1
+--- !u!114 &1592909453
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1592909450}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_text: 'Subtitle Subtitle Subtitle Subtitle Subtitle Subtitle Subtitle Subtitle
+    Subtitle '
+  m_isRightToLeft: 0
+  m_fontAsset: {fileID: 11400000, guid: ea5a62bb74d16a049815f5b119809384, type: 2}
+  m_sharedMaterial: {fileID: 8437622273908661436, guid: ea5a62bb74d16a049815f5b119809384,
+    type: 2}
+  m_fontSharedMaterials: []
+  m_fontMaterial: {fileID: 0}
+  m_fontMaterials: []
+  m_fontColor32:
+    serializedVersion: 2
+    rgba: 4294967295
+  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
+  m_enableVertexGradient: 0
+  m_colorMode: 3
+  m_fontColorGradient:
+    topLeft: {r: 1, g: 1, b: 1, a: 1}
+    topRight: {r: 1, g: 1, b: 1, a: 1}
+    bottomLeft: {r: 1, g: 1, b: 1, a: 1}
+    bottomRight: {r: 1, g: 1, b: 1, a: 1}
+  m_fontColorGradientPreset: {fileID: 0}
+  m_spriteAsset: {fileID: 0}
+  m_tintAllSprites: 0
+  m_StyleSheet: {fileID: 0}
+  m_TextStyleHashCode: -1183493901
+  m_overrideHtmlColors: 0
+  m_faceColor:
+    serializedVersion: 2
+    rgba: 4294967295
+  m_fontSize: 50
+  m_fontSizeBase: 50
+  m_fontWeight: 400
+  m_enableAutoSizing: 0
+  m_fontSizeMin: 18
+  m_fontSizeMax: 72
+  m_fontStyle: 0
+  m_HorizontalAlignment: 2
+  m_VerticalAlignment: 512
+  m_textAlignment: 65535
+  m_characterSpacing: 0
+  m_wordSpacing: 0
+  m_lineSpacing: 0
+  m_lineSpacingMax: 0
+  m_paragraphSpacing: 0
+  m_charWidthMaxAdj: 0
+  m_enableWordWrapping: 1
+  m_wordWrappingRatios: 0.4
+  m_overflowMode: 0
+  m_linkedTextComponent: {fileID: 0}
+  parentLinkedComponent: {fileID: 0}
+  m_enableKerning: 1
+  m_enableExtraPadding: 0
+  checkPaddingRequired: 0
+  m_isRichText: 1
+  m_parseCtrlCharacters: 1
+  m_isOrthographic: 1
+  m_isCullingEnabled: 0
+  m_horizontalMapping: 0
+  m_verticalMapping: 0
+  m_uvLineOffset: 0
+  m_geometrySortingOrder: 0
+  m_IsTextObjectScaleStatic: 0
+  m_VertexBufferAutoSizeReduction: 0
+  m_useMaxVisibleDescender: 1
+  m_pageToDisplay: 1
+  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_isUsingLegacyAnimationComponent: 0
+  m_isVolumetricText: 0
+  m_hasFontAssetChanged: 0
+  m_baseMaterial: {fileID: 0}
+  m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
 --- !u!1 &1601724460 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 900709242954569306, guid: b3ba8a7b8c6243042a207d9af4db68ec,
@@ -2414,6 +3008,185 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 6
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1903539538
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1903539542}
+  - component: {fileID: 1903539541}
+  - component: {fileID: 1903539540}
+  - component: {fileID: 1903539539}
+  m_Layer: 5
+  m_Name: Canvas
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1903539539
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1903539538}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc42784cf147c0c48a680349fa168899, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_IgnoreReversedGraphics: 1
+  m_BlockingObjects: 0
+  m_BlockingMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+--- !u!114 &1903539540
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1903539538}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_UiScaleMode: 0
+  m_ReferencePixelsPerUnit: 100
+  m_ScaleFactor: 1
+  m_ReferenceResolution: {x: 800, y: 600}
+  m_ScreenMatchMode: 0
+  m_MatchWidthOrHeight: 0
+  m_PhysicalUnit: 3
+  m_FallbackScreenDPI: 96
+  m_DefaultSpriteDPI: 96
+  m_DynamicPixelsPerUnit: 1
+  m_PresetInfoIsWorld: 0
+--- !u!223 &1903539541
+Canvas:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1903539538}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_RenderMode: 0
+  m_Camera: {fileID: 0}
+  m_PlaneDistance: 100
+  m_PixelPerfect: 0
+  m_ReceivesEvents: 1
+  m_OverrideSorting: 0
+  m_OverridePixelPerfect: 0
+  m_SortingBucketNormalizedSize: 0
+  m_VertexColorAlwaysGammaSpace: 0
+  m_AdditionalShaderChannelsFlag: 25
+  m_SortingLayerID: 0
+  m_SortingOrder: 0
+  m_TargetDisplay: 0
+--- !u!224 &1903539542
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1903539538}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0, y: 0, z: 0}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1539523515}
+  - {fileID: 810847247}
+  m_Father: {fileID: 0}
+  m_RootOrder: 8
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0, y: 0}
+--- !u!1 &2020910114
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2020910115}
+  - component: {fileID: 2020910116}
+  - component: {fileID: 2020910117}
+  m_Layer: 5
+  m_Name: SubtitleBackground
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &2020910115
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2020910114}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 810847247}
+  m_RootOrder: 1
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 1819.72, y: 58.37}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!222 &2020910116
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2020910114}
+  m_CullTransparentMesh: 1
+--- !u!114 &2020910117
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2020910114}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Material: {fileID: 0}
+  m_Color: {r: 0, g: 0, b: 0, a: 0.8509804}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 21300000, guid: 15393ebb190309c448f9b0cd9df63bb4, type: 3}
+  m_Type: 0
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
 --- !u!1 &2098528361
 GameObject:
   m_ObjectHideFlags: 0
@@ -2463,43 +3236,98 @@ MonoBehaviour:
   idleAnimation: {fileID: 7400000, guid: bde6f13d973156a4ebee8a29d600f4db, type: 2}
   talkingAnimation: {fileID: 7400000, guid: 9a490b3ea10f41645bee8b677147e665, type: 2}
   audioThreshold: 0.002
-  audioCheckInterval: 0.01
   targetLightIntensity: 3
   floatAmplitude: 0.3
   floatSpeed: 1
   videoLightIntensity: 150
   lightOpeningSFX: {fileID: 8300000, guid: d8f69bbaf9e2d6b4987eac81cc71c495, type: 3}
   sfxAudioSource: {fileID: 257371410}
-  initialBotAudio: {fileID: 8300000, guid: e83cfa9c02f301e45b67660423049389, type: 3}
+  initialBotAudio:
+    clip: {fileID: 8300000, guid: a0d5fb05d4ef7694ab710ec4a26806a8, type: 3}
+    segments:
+    - timestamp: 0
+      text: Hey future Dycian! I'm AXEL your AI guide
+      duration: 3
+    - timestamp: 3
+      text: Ready to discover your future?
+      duration: 3
+    - timestamp: 6
+      text: Let's go!
+      duration: 1
   initialBotPosition: {fileID: 1728458979}
   initialBotAnimation: {fileID: 7400000, guid: d2cf6c35e1b26374483b1ca336a9f650, type: 2}
   firstVideo: {fileID: 32900000, guid: abb7e3af1d02fc844a1e284c791876f6, type: 3}
   firstVideoAudios:
   - timestamp: 1
-    audioClip: {fileID: 8300000, guid: 414a251720645ef47a1f74d2612a19fd, type: 3}
+    audioClip: {fileID: 8300000, guid: eb2e54f237e4f204b8f79c750082edd5, type: 3}
     botPosition: {fileID: 763259297}
     botAnimation: {fileID: 7400000, guid: 0097bd58469975746b49386bbd3c8d67, type: 2}
+    subtitleSegments:
+    - timestamp: 0
+      text: Welcome to Dr. Yanga's Colleges, Inc.
+      duration: 3
+    - timestamp: 3
+      text: Where we don't just build dreams, we shape futures.
+      duration: 3
+    subtitleDuration: 50
   - timestamp: 13
-    audioClip: {fileID: 8300000, guid: 2ca2634fe65bc5c4d900e47068e21cc7, type: 3}
+    audioClip: {fileID: 8300000, guid: d4f86011ef16f2946b2d2c989afab346, type: 3}
     botPosition: {fileID: 389434184}
     botAnimation: {fileID: 7400000, guid: 312555e68ce8acd43a661a6ff1a61e0e, type: 2}
+    subtitleSegments:
+    - timestamp: 0
+      text: At DYCI, you get more than classes
+      duration: 3
+    - timestamp: 3
+      text: Think cutting-edge labs, awesome teachers, and a community that helps
+        you level up
+      duration: 7
+    subtitleDuration: 0
   - timestamp: 28
-    audioClip: {fileID: 8300000, guid: f5dda96d9b5789543974e4169d45a0d4, type: 3}
+    audioClip: {fileID: 8300000, guid: c243f35be79305242934f967ad153d56, type: 3}
     botPosition: {fileID: 691806774}
     botAnimation: {fileID: 7400000, guid: 0097bd58469975746b49386bbd3c8d67, type: 2}
+    subtitleSegments:
+    - timestamp: 0
+      text: From science labs to our robotics museum
+      duration: 3
+    - timestamp: 3
+      text: We've got the tools for you to explore, create, and win!
+      duration: 5
+    subtitleDuration: 0
   - timestamp: 39
     audioClip: {fileID: 0}
     botPosition: {fileID: 162231587}
     botAnimation: {fileID: 7400000, guid: ca92ad763fa30ce4f9e099230a2945d8, type: 2}
-  secondBotAudio: {fileID: 8300000, guid: 17bcda7657c95f141b201eafe030c60f, type: 3}
+    subtitleSegments: []
+    subtitleDuration: 0
+  secondBotAudio:
+    clip: {fileID: 8300000, guid: 23faad424fb67d54d8568826ba15a401, type: 3}
+    segments:
+    - timestamp: 0
+      text: Let's check out the strands you can choose from!
+      duration: 3
   secondBotPosition: {fileID: 1728458979}
   secondBotAnimation: {fileID: 7400000, guid: ca92ad763fa30ce4f9e099230a2945d8, type: 2}
-  thirdBotAudio: {fileID: 0}
+  thirdBotAudio:
+    clip: {fileID: 0}
+    segments: []
   thirdBotPosition: {fileID: 0}
   thirdBotAnimation: {fileID: 0}
   strandSequences:
   - strandName: ABM
-    botAudio: {fileID: 8300000, guid: 958049396f23b76498d38ee0f6a5715a, type: 3}
+    botAudio:
+      clip: {fileID: 8300000, guid: 04edf26c2b0170542b1764ece9406517, type: 3}
+      segments:
+      - timestamp: 0
+        text: ABM
+        duration: 1
+      - timestamp: 1
+        text: For future CEOs and business bosses
+        duration: 3
+      - timestamp: 4
+        text: Master money, management, and marketing
+        duration: 3
     botPosition: {fileID: 1728458979}
     botAnimation: {fileID: 7400000, guid: ca92ad763fa30ce4f9e099230a2945d8, type: 2}
     video: {fileID: 32900000, guid: be3e13d02bf065c46a0bec0616ec9967, type: 3}
@@ -2508,8 +3336,24 @@ MonoBehaviour:
       audioClip: {fileID: 0}
       botPosition: {fileID: 162231587}
       botAnimation: {fileID: 7400000, guid: d2cf6c35e1b26374483b1ca336a9f650, type: 2}
+      subtitleSegments: []
+      subtitleDuration: 0
   - strandName: STEM
-    botAudio: {fileID: 8300000, guid: f5a80ce49ce720641b45c50702e7cf4d, type: 3}
+    botAudio:
+      clip: {fileID: 8300000, guid: 9297580867bd9944e9fb5bc26a5d1320, type: 3}
+      segments:
+      - timestamp: 0
+        text: STEM
+        duration: 1
+      - timestamp: 1
+        text: Love problem-solving?
+        duration: 2
+      - timestamp: 2.5
+        text: Dive into Science, Tech, Engineering, and Math
+        duration: 2
+      - timestamp: 4.5
+        text: Build the future
+        duration: 2
     botPosition: {fileID: 1728458979}
     botAnimation: {fileID: 7400000, guid: ca92ad763fa30ce4f9e099230a2945d8, type: 2}
     video: {fileID: 32900000, guid: bae9ea161a43eaa4a8ed13dfcedf0b20, type: 3}
@@ -2518,34 +3362,118 @@ MonoBehaviour:
       audioClip: {fileID: 0}
       botPosition: {fileID: 162231587}
       botAnimation: {fileID: 7400000, guid: d2cf6c35e1b26374483b1ca336a9f650, type: 2}
-  fourthBotAudio: {fileID: 8300000, guid: 24cc35c5fdb469143a1e79195edf564e, type: 3}
+      subtitleSegments: []
+      subtitleDuration: 0
+  fourthBotAudio:
+    clip: {fileID: 8300000, guid: 4d245c9ff975d4749a86c0e6f5f6a28f, type: 3}
+    segments:
+    - timestamp: 0
+      text: Now you know DYCI
+      duration: 2
+    - timestamp: 2
+      text: Time to show you how StrandVenture works!
+      duration: 3
   fourthBotPosition: {fileID: 1728458979}
   fourthBotAnimation: {fileID: 7400000, guid: ca92ad763fa30ce4f9e099230a2945d8, type: 2}
-  fifthBotAudio: {fileID: 8300000, guid: c9ca2d154245ca84d97e97dac8fa6313, type: 3}
+  fifthBotAudio:
+    clip: {fileID: 8300000, guid: 1d03f1eb9843da148b249557ccd78ab3, type: 3}
+    segments:
+    - timestamp: 0
+      text: "This isn't a boring test \u2014 it's a simulation adventure!"
+      duration: 4
+    - timestamp: 4
+      text: Explore virtual classrooms, try out simulations, and visit a digital
+        Job Expo
+      duration: 6
   fifthBotPosition: {fileID: 1728458979}
   fifthBotAnimation: {fileID: 0}
   fifthBotVideo: {fileID: 0}
   sixthSequenceArray:
-  - botAudio: {fileID: 8300000, guid: b9ae16ccc1985d146bc40d8cc601cd85, type: 3}
+  - botAudio:
+      clip: {fileID: 8300000, guid: 7a5ce3a719eb5f14b88fc4dd70a396e9, type: 3}
+      segments:
+      - timestamp: 0
+        text: 'Phase 1: EXPLORE'
+        duration: 2
+      - timestamp: 2
+        text: "Take our Aptitude Exam \u2014 discover your strengths and find your
+          perfect strand match"
+        duration: 6
+      - timestamp: 8
+        text: No pressure, just self-discovery
+        duration: 1.5
+      - timestamp: 9.5
+        text: You'll get instant recommendations based on your unique style!
+        duration: 4
     botPosition: {fileID: 389434184}
     botAnimation: {fileID: 7400000, guid: 0097bd58469975746b49386bbd3c8d67, type: 2}
     video: {fileID: 32900000, guid: eabf645dc04475643a9981f7b4f2b62a, type: 3}
     timedAudios: []
-  - botAudio: {fileID: 8300000, guid: 7b5c4ff9d1328ee4e82e0cc90620bad4, type: 3}
+  - botAudio:
+      clip: {fileID: 8300000, guid: f224ade758fff224e9155f73d750a5b5, type: 3}
+      segments:
+      - timestamp: 0
+        text: 'Phase 2: EXPERIENCE'
+        duration: 2
+      - timestamp: 2
+        text: Step into DYCI's virtual strand rooms!
+        duration: 3
+      - timestamp: 5
+        text: Try the ROBO Lab for ICT, the SCIRE Hub for STEM, and explore ABM,
+          HUMSS, HE, and Maritime
+        duration: 9
+      - timestamp: 14
+        text: Feel what it's like to be a real DYCIan!
+        duration: 4
     botPosition: {fileID: 763259297}
     botAnimation: {fileID: 7400000, guid: 312555e68ce8acd43a661a6ff1a61e0e, type: 2}
     video: {fileID: 32900000, guid: 865bd7c6534420b43b8b271ed565d50a, type: 3}
     timedAudios: []
-  - botAudio: {fileID: 8300000, guid: f5705b57966545342a1f51159d2b4355, type: 3}
+  - botAudio:
+      clip: {fileID: 8300000, guid: 69f630a3fe3a8534e96a9b3ec1603b5f, type: 3}
+      segments:
+      - timestamp: 0
+        text: 'Phase 3: EMPOWER'
+        duration: 2
+      - timestamp: 2
+        text: Visit the virtual Job Expo at Marciano Complex!
+        duration: 3
+      - timestamp: 5
+        text: Explore career booths and do a friendly mock interview
+        duration: 4
+      - timestamp: 9
+        text: "No judgment \u2014 just reflect on what you've learned about yourself"
+        duration: 4
     botPosition: {fileID: 389434184}
     botAnimation: {fileID: 7400000, guid: 0097bd58469975746b49386bbd3c8d67, type: 2}
     video: {fileID: 32900000, guid: 594a29ecf754e414790e7409384cb1ba, type: 3}
     timedAudios: []
-  finalBotAudio: {fileID: 8300000, guid: 1cc1ee416468c25418f096195ef5474f, type: 3}
+  finalBotAudio:
+    clip: {fileID: 8300000, guid: ffb7ea14eef33084bb2680959aaa0cbb, type: 3}
+    segments:
+    - timestamp: 0
+      text: 'That''s it! Three phases: EXPLORE, EXPERIENCE, EMPOWER'
+      duration: 5
+    - timestamp: 5
+      text: From finding your strengths to walking our virtual halls to owning your
+        future
+      duration: 4
+    - timestamp: 9
+      text: "Ready to begin? Let's find your future \u2014 the DYCIAN way!"
+      duration: 4
   finalBotPosition: {fileID: 1728458979}
   finalBotAnimation: {fileID: 7400000, guid: ca92ad763fa30ce4f9e099230a2945d8, type: 2}
   fadeOutDuration: 2
   videoFadeDuration: 0.5
+  subtitlePanel: {fileID: 810847246}
+  subtitleBackground: {fileID: 2020910117}
+  subtitleText: {fileID: 1592909453}
+  skipUIPanel: {fileID: 1539523514}
+  skipUIText: {fileID: 1251734590}
+  skipFillImage: {fileID: 726075763}
+  skipDelay: 2.5
+  skipVisibleAlpha: 0.6
+  skipHoldDuration: 1
 --- !u!4 &2098528363
 Transform:
   m_ObjectHideFlags: 0
@@ -2559,5 +3487,5 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 8
+  m_RootOrder: 9
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
