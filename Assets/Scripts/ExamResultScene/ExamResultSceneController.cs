@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Diagnostics;
 using Debug = UnityEngine.Debug;
+using System;
 
 [System.Serializable]
 public class PieSlice
@@ -17,7 +18,16 @@ public class PieSlice
     public string strandName;
     public Image sliceImage;
     public TMP_Text percentageText;
-    [HideInInspector] public float targetFill;
+    [HideInInspector] public float targetFill;   // 0–1, used for the pie fill (share)
+    [HideInInspector] public float rawPercent;   // original percent from PlayerPrefs
+}
+
+[System.Serializable]
+public class TimedSubtitle
+{
+    public float startTime;   // seconds from start of audio
+    public float duration;    // how long to show this line
+    [TextArea] public string text;
 }
 
 public class ExamResultSceneController : MonoBehaviour
@@ -72,6 +82,18 @@ public class ExamResultSceneController : MonoBehaviour
     public float fillDuration = 1.5f;
     public AnimationCurve fillCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
 
+    [Header("Pie Graph Highlight")]
+    public Color topStrandGlowColor = Color.white;
+    public float topStrandGlowDistance = 3f;
+
+    [Header("Subtitles")]
+    public TMP_Text subtitleText;
+    public GameObject subtitleBackground;       // background panel for subtitles
+    public float subtitleClearExtraDelay = 0.5f;
+    public TimedSubtitle[] introSubtitles;      // manual timeline for intro audio
+    [Tooltip("Max words shown at once for AI TTS subtitles")]
+    public int maxWordsPerSubtitleChunk = 10;
+
     private Vector2 botFinalPos;
     private Vector2 buttonOriginalPos;
     private Coroutine buttonFloatCoroutine;
@@ -86,29 +108,44 @@ public class ExamResultSceneController : MonoBehaviour
     private bool isInsightsLoaded = false;
     private bool isInsightsLoading = false;
 
+    // track best strands (supports ties)
+    private List<string> topStrands = new List<string>();
+    private float topStrandPercent = 0f;
+    private Coroutine subtitleCoroutine;
+    private Coroutine subtitleTimelineCoroutine;
+
     void Start()
     {
+        string topCareer = PlayerPrefs.GetString("RIASEC_TopCareer", "Unknown");
+        string careerlist = PlayerPrefs.GetString("RIASEC_CareerRecommendations", "Unknown");
+        Debug.Log($"Top Career: {topCareer}");
+        Debug.Log($"Career Recommendations: {careerlist}");
+
         LoadGroqApiKey();
         InitializePiper();
 
+        // Fade in
         fadeOverlay.alpha = 1f;
         fadeOverlay.blocksRaycasts = true;
         StartCoroutine(FadeCanvas(fadeOverlay, 1f, 0f, 1f));
 
         if (backgroundVideo != null) backgroundVideo.Play();
 
+        // Bot setup
         RectTransform botRect = botContainer.GetComponent<RectTransform>();
         botFinalPos = botRect.anchoredPosition;
         botRect.localScale = Vector3.zero;
         botContainer.SetActive(true);
         botImage.sprite = idleSprite;
 
+        // Insights panel setup
         if (insightsPanel != null)
         {
             insightsPanel.SetActive(false);
             insightsPanel.GetComponent<RectTransform>().localScale = Vector3.zero;
         }
 
+        // Bot button setup
         buttonOriginalPos = botButton.GetComponent<RectTransform>().anchoredPosition;
         Button btnComponent = botButton.GetComponent<Button>();
         if (btnComponent == null)
@@ -118,19 +155,265 @@ public class ExamResultSceneController : MonoBehaviour
         btnComponent.onClick.AddListener(OnBotButtonClicked);
         buttonFloatCoroutine = StartCoroutine(ButtonFloatingMotion());
 
-        string bestStrand = PlayerPrefs.GetString("BestStrand", "Unknown");
-        float bestScore = PlayerPrefs.GetFloat("BestScore", 0f);
-        bestStrandText.text = $"Your best strand is: {bestStrand} ({bestScore:F1}%)";
-
+        // Load pie graph data first so we can know top strands (supporting ties)
         LoadPieGraphData();
+
+        // Best strand label (supports multiple top strands)
+        if (topStrands.Count == 0 || topStrandPercent <= 0f)
+        {
+            bestStrandText.text = "Your best strand could not be determined.";
+        }
+        else if (topStrands.Count == 1)
+        {
+            bestStrandText.text = $"Your best strand is: {topStrands[0]} ({topStrandPercent:F1}%)";
+        }
+        else
+        {
+            string joined = string.Join(", ", topStrands);
+            bestStrandText.text = $"Your best strands are: {joined} ({topStrandPercent:F1}%)";
+        }
+
+        // Apply glow to all top strands
+        ApplyTopStrandGlow();
+
+        // Animate pie graph
         StartCoroutine(AnimatePieSlices());
 
+        // Continue button
         continueButton.onClick.AddListener(OnContinueClicked);
 
+        // Bot intro and AI preloading
         StartCoroutine(BotIntroSequence());
-
         StartCoroutine(PreloadAIInsights());
+
+        // Init subtitle (hidden)
+        if (subtitleText != null)
+        {
+            subtitleText.text = "";
+            subtitleText.gameObject.SetActive(false);
+        }
+        if (subtitleBackground != null)
+        {
+            subtitleBackground.SetActive(false);
+        }
     }
+
+    // ---------- SUBTITLE HELPERS ----------
+
+    private void SetSubtitle(string text, float autoClearAfterSeconds = -1f)
+    {
+        if (subtitleText == null) return;
+
+        // We are overriding any timeline subtitles
+        StopSubtitleTimeline();
+
+        if (subtitleCoroutine != null)
+        {
+            StopCoroutine(subtitleCoroutine);
+            subtitleCoroutine = null;
+        }
+
+        if (string.IsNullOrEmpty(text))
+        {
+            HideSubtitleUI();
+            return;
+        }
+
+        ShowSubtitleUI(text);
+
+        if (autoClearAfterSeconds > 0f)
+        {
+            subtitleCoroutine = StartCoroutine(ClearSubtitleAfterDelay(autoClearAfterSeconds));
+        }
+    }
+
+    private IEnumerator ClearSubtitleAfterDelay(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        HideSubtitleUI();
+    }
+
+    private void ShowSubtitleUI(string text)
+    {
+        if (subtitleText == null) return;
+
+        subtitleText.text = text;
+        subtitleText.gameObject.SetActive(true);
+        if (subtitleBackground != null)
+            subtitleBackground.SetActive(true);
+    }
+
+    private void HideSubtitleUI()
+    {
+        if (subtitleText != null)
+        {
+            subtitleText.text = "";
+            subtitleText.gameObject.SetActive(false);
+        }
+        if (subtitleBackground != null)
+            subtitleBackground.SetActive(false);
+    }
+
+    private void StartSubtitleTimeline(TimedSubtitle[] timeline, AudioSource source)
+    {
+        if (timeline == null || timeline.Length == 0 || source == null) return;
+
+        if (subtitleTimelineCoroutine != null)
+        {
+            StopCoroutine(subtitleTimelineCoroutine);
+        }
+        subtitleTimelineCoroutine = StartCoroutine(SubtitleTimelineRoutine(timeline, source));
+    }
+
+    private void StopSubtitleTimeline()
+    {
+        if (subtitleTimelineCoroutine != null)
+        {
+            StopCoroutine(subtitleTimelineCoroutine);
+            subtitleTimelineCoroutine = null;
+        }
+        HideSubtitleUI();
+    }
+
+    private IEnumerator SubtitleTimelineRoutine(TimedSubtitle[] timeline, AudioSource source)
+    {
+        if (timeline == null || timeline.Length == 0 || source == null || source.clip == null)
+            yield break;
+
+        // wait until audio starts playing
+        while (source.clip != null && !source.isPlaying)
+            yield return null;
+
+        while (source.isPlaying)
+        {
+            float t = source.time;
+            bool hasSubtitle = false;
+
+            for (int i = 0; i < timeline.Length; i++)
+            {
+                float start = Mathf.Max(0f, timeline[i].startTime);
+                float duration = Mathf.Max(0f, timeline[i].duration);
+                float end = start + duration;
+
+                if (t >= start && t < end)
+                {
+                    ShowSubtitleUI(timeline[i].text);
+                    hasSubtitle = true;
+                    break;
+                }
+            }
+
+            if (!hasSubtitle)
+            {
+                // no subtitle for this moment
+                HideSubtitleUI();
+            }
+
+            yield return null;
+        }
+
+        HideSubtitleUI();
+        subtitleTimelineCoroutine = null;
+    }
+
+    // Build auto subtitles for AI TTS: split text into chunks of up to N words
+    // and distribute them across the clip length.
+    private TimedSubtitle[] BuildAutoSubtitleTimeline(string text, float clipLength)
+    {
+        if (string.IsNullOrWhiteSpace(text) || clipLength <= 0.1f)
+            return null;
+
+        string trimmed = text.Trim();
+
+        // First split into sentences (roughly)
+        string[] rawSentences = System.Text.RegularExpressions.Regex.Split(
+            trimmed,
+            @"(?<=[\.!\?])\s+"
+        );
+
+        // Then split each sentence into smaller word chunks
+        List<string> chunks = new List<string>();
+
+        int maxWords = Mathf.Max(3, maxWordsPerSubtitleChunk); // at least 3 words to avoid super tiny chunks
+
+        foreach (var raw in rawSentences)
+        {
+            string sentence = raw.Trim();
+            if (string.IsNullOrEmpty(sentence))
+                continue;
+
+            // Replace newlines with spaces to avoid weird splits
+            sentence = sentence.Replace("\n", " ").Replace("\r", " ");
+
+            string[] words = sentence.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (words.Length == 0)
+                continue;
+
+            int index = 0;
+            while (index < words.Length)
+            {
+                int remaining = words.Length - index;
+
+                // Take up to maxWords words for this chunk
+                int take = Mathf.Min(maxWords, remaining);
+
+                // If last bit is small (e.g. 2–3 words), just include all of them
+                if (remaining <= maxWords + 2)
+                {
+                    take = remaining;
+                }
+
+                string chunkText = string.Join(" ", new ArraySegment<string>(words, index, take));
+                chunks.Add(chunkText);
+
+                index += take;
+            }
+        }
+
+        // Fallback: if splitting somehow produced nothing, use the whole text as one chunk
+        if (chunks.Count == 0)
+        {
+            chunks.Add(trimmed);
+        }
+
+        // Now compute timing based on chunk lengths (char count)
+        int totalChars = 0;
+        foreach (var c in chunks)
+            totalChars += c.Length;
+
+        if (totalChars <= 0)
+            totalChars = chunks.Count;
+
+        TimedSubtitle[] result = new TimedSubtitle[chunks.Count];
+        float currentStart = 0f;
+
+        for (int i = 0; i < chunks.Count; i++)
+        {
+            string chunk = chunks[i];
+            float proportion = chunk.Length / (float)totalChars;
+            float duration = proportion * clipLength;
+
+            result[i] = new TimedSubtitle
+            {
+                startTime = currentStart,
+                duration = duration,
+                text = chunk
+            };
+
+            currentStart += duration;
+        }
+
+        // Ensure the last chunk reaches (almost) the clip end
+        if (result.Length > 0)
+        {
+            float lastStart = result[result.Length - 1].startTime;
+            result[result.Length - 1].duration = Mathf.Max(0.2f, clipLength - lastStart);
+        }
+
+        return result;
+    }
+
+    // ---------- PIPER / GROQ CONFIG ----------
 
     private void InitializePiper()
     {
@@ -191,6 +474,7 @@ public class ExamResultSceneController : MonoBehaviour
 
         yield return new WaitForSeconds(2f);
 
+        // Generate main insights text
         yield return StartCoroutine(GenerateGroqInsights());
 
         if (string.IsNullOrEmpty(cachedInsightsText))
@@ -200,6 +484,7 @@ public class ExamResultSceneController : MonoBehaviour
             yield break;
         }
 
+        // Summarize for TTS
         bool summaryComplete = false;
         yield return StartCoroutine(SummarizeInsightsForTTS(cachedInsightsText, summary =>
         {
@@ -213,6 +498,7 @@ public class ExamResultSceneController : MonoBehaviour
             cachedSummaryText = cachedInsightsText;
         }
 
+        // Generate TTS
         bool ttsComplete = false;
         yield return StartCoroutine(GeneratePiperTTS(cachedSummaryText, clip =>
         {
@@ -241,10 +527,13 @@ public class ExamResultSceneController : MonoBehaviour
 
         yield return StartCoroutine(BotEntranceAnimation());
 
-        string bestStrand = PlayerPrefs.GetString("BestStrand", "Unknown");
-        string introText = $"Welcome! Your results are in. Your best fit is {bestStrand}. Let me explain your scores!";
+        string topStrandList = (topStrands.Count > 0) ? string.Join(", ", topStrands) : "Unknown";
+        string introText = $"Welcome! Your results are in. Your best fit is {topStrandList}. Let me explain your scores!";
 
-        yield return StartCoroutine(PlayBotSpeech(introAudioClip));
+        Debug.Log($"Bot Intro Text: {introText}");
+
+        // Play intro with manual subtitle timeline (if provided), otherwise single line
+        yield return StartCoroutine(PlayBotSpeech(introAudioClip, introSubtitles, introText));
 
         yield return StartCoroutine(BotOutroAnimation());
 
@@ -276,7 +565,7 @@ public class ExamResultSceneController : MonoBehaviour
 
             if (isInsightsLoading)
             {
-                insightsContentText.text = "Analyzing your results...";
+                insightsContentText.text = "Analyzing your results... This might take a while.";
             }
             else if (isInsightsLoaded)
             {
@@ -321,13 +610,16 @@ public class ExamResultSceneController : MonoBehaviour
 
         if (cachedTTSClip != null)
         {
-            botAudio.clip = cachedTTSClip;
-            botAudio.Play();
-            yield return StartCoroutine(BotTalkAnimationWithAudio());
+            string subtitleSource = !string.IsNullOrEmpty(cachedSummaryText) ? cachedSummaryText : cachedInsightsText;
+            TimedSubtitle[] autoTimeline = BuildAutoSubtitleTimeline(subtitleSource, cachedTTSClip.length);
+
+            // Use auto-timed subtitles based on TTS clip length
+            yield return StartCoroutine(PlayBotSpeech(cachedTTSClip, autoTimeline, subtitleSource));
         }
         else
         {
             Debug.LogWarning("⚠️ No TTS clip or fallback available, using animation only");
+            SetSubtitle("I have some insights about your strand results, but audio is unavailable right now.", 3f);
             yield return StartCoroutine(BotTalkAnimation(3f));
         }
 
@@ -431,33 +723,60 @@ public class ExamResultSceneController : MonoBehaviour
 
     void LoadPieGraphData()
     {
-        float totalScore = 0f;
+        // First pass: read all percents, compute total, and determine top strands (supports ties)
+        float totalPercent = 0f;
+        topStrands.Clear();
+        topStrandPercent = 0f;
 
         foreach (var slice in pieSlices)
         {
-            float score = PlayerPrefs.GetFloat($"{slice.strandName}_Score", 0f);
-            totalScore += score;
+            float percent = Mathf.Max(0f, PlayerPrefs.GetFloat($"Strand_{slice.strandName}_Percent", 0f));
+            slice.rawPercent = percent;
+            totalPercent += percent;
+
+            if (percent > topStrandPercent + 0.01f)
+            {
+                topStrandPercent = percent;
+                topStrands.Clear();
+                topStrands.Add(slice.strandName);
+            }
+            else if (Mathf.Approximately(percent, topStrandPercent) && percent > 0f)
+            {
+                if (!topStrands.Contains(slice.strandName))
+                    topStrands.Add(slice.strandName);
+            }
         }
 
+        // Second pass: normalize to 0–1 for the pie, set rotation & text
         float currentFillOffset = 0f;
 
         foreach (var slice in pieSlices)
         {
-            float score = PlayerPrefs.GetFloat($"{slice.strandName}_Score", 0f);
-            Debug.Log($"{slice.strandName}_Score: {score}");
+            float fillAmount = 0f;
 
-            float fillAmount = totalScore > 0 ? (score / totalScore) : 0f;
+            if (totalPercent > 0f)
+            {
+                // share of the circle (0–1)
+                fillAmount = slice.rawPercent / totalPercent;
+            }
+
             slice.targetFill = fillAmount;
-            slice.sliceImage.fillAmount = 0f;
+            slice.sliceImage.fillAmount = 0f; // start from 0 for animation
 
-            slice.sliceImage.fillOrigin = 2;
+            slice.sliceImage.fillOrigin = 2;  // radial 360
             RectTransform rt = slice.sliceImage.GetComponent<RectTransform>();
             rt.localEulerAngles = new Vector3(0, 0, -currentFillOffset * 360f);
 
             currentFillOffset += fillAmount;
 
             if (slice.percentageText != null)
-                slice.percentageText.text = "0%";
+            {
+                // Start at 0% for animation, but show PIE SHARE % (not raw)
+                slice.percentageText.text = $"{slice.strandName}: 0%";
+                slice.percentageText.color = slice.sliceImage.color;
+            }
+
+            Debug.Log($"{slice.strandName} raw percent: {slice.rawPercent:F1}%, pie share: {fillAmount * 100f:F1}%");
         }
     }
 
@@ -474,23 +793,25 @@ public class ExamResultSceneController : MonoBehaviour
                 float t = Mathf.Clamp01(elapsed / fillDuration);
                 float curveValue = fillCurve.Evaluate(t);
 
+                // Animate the pie fill (0 → normalized targetFill)
                 float newFill = Mathf.Lerp(0f, slice.targetFill, curveValue);
                 slice.sliceImage.fillAmount = newFill;
 
+                // Animate the label from 0 → pie share %
                 if (slice.percentageText != null)
                 {
-                    float actualPercentage = newFill * 100f;
-                    slice.percentageText.text = $"{slice.strandName}: {Mathf.RoundToInt(actualPercentage)}%";
+                    float displayedPercent = Mathf.Lerp(0f, slice.targetFill * 100f, curveValue);
+                    slice.percentageText.text = $"{slice.strandName}: {Mathf.RoundToInt(displayedPercent)}%";
                 }
 
                 yield return null;
             }
 
+            // Snap to final values
             slice.sliceImage.fillAmount = slice.targetFill;
             if (slice.percentageText != null)
             {
-                float actualPercentage = slice.targetFill * 100f;
-                slice.percentageText.text = $"{slice.strandName}: {Mathf.RoundToInt(actualPercentage)}%";
+                slice.percentageText.text = $"{slice.strandName}: {Mathf.RoundToInt(slice.targetFill * 100f)}%";
             }
         }
     }
@@ -499,7 +820,36 @@ public class ExamResultSceneController : MonoBehaviour
     {
         StopCoroutine(nameof(AnimatePieSlices));
         LoadPieGraphData();
+        ApplyTopStrandGlow();
         StartCoroutine(AnimatePieSlices());
+    }
+
+    // apply glow/outline to all top strands (supports ties)
+    private void ApplyTopStrandGlow()
+    {
+        foreach (var slice in pieSlices)
+        {
+            bool isTop = topStrands.Contains(slice.strandName);
+            Outline outline = slice.sliceImage.GetComponent<Outline>();
+
+            if (isTop)
+            {
+                if (outline == null)
+                {
+                    outline = slice.sliceImage.gameObject.AddComponent<Outline>();
+                }
+                outline.effectColor = topStrandGlowColor;
+                outline.effectDistance = new Vector2(topStrandGlowDistance, topStrandGlowDistance);
+                outline.enabled = true;
+            }
+            else
+            {
+                if (outline != null)
+                {
+                    outline.enabled = false;
+                }
+            }
+        }
     }
 
     #endregion
@@ -510,27 +860,29 @@ public class ExamResultSceneController : MonoBehaviour
     {
         string url = "https://api.groq.com/openai/v1/chat/completions";
 
-        string resultsData = "Student Results:\n";
+        string resultsData = "Student Results (RIASEC percentages):\n";
 
+        // Use strand percents
         foreach (var slice in pieSlices)
         {
             string strand = slice.strandName;
-            string strandStats = PlayerPrefs.GetString($"{strand}_Stats", "No data available.");
-            resultsData += $"- {strand}: {strandStats}\n";
-            Debug.Log($"Strand {strand} stats: {strandStats}");
+            float percent = PlayerPrefs.GetFloat($"Strand_{strand}_Percent", 0f);
+            resultsData += $"- {strand}: {percent:F1}%\n";
+            Debug.Log($"Strand {strand} percent (for AI): {percent:F1}%");
         }
 
-        string bestStrand = PlayerPrefs.GetString("BestStrand", "Unknown");
-        resultsData += $"\nHighest Score: {bestStrand}";
+        // Use topStrandPercent / list we already computed
+        string topStrandList = (topStrands.Count > 0) ? string.Join(", ", topStrands) : "Unknown";
+        resultsData += $"\nHighest Score: {topStrandList} ({topStrandPercent:F1}%)";
 
-        string prompt = $"{resultsData}\n\nBased on these results, give your AI opinion on which track the student is best suited for and explain why in simple sentences and terms.";
+        string prompt = $"{resultsData}\n\nBased on these results, give your AI opinion on which track the student is best suited for and explain why in simple short sentences and terms, keep it short and not too long.";
 
         ChatRequest chatRequest = new ChatRequest
         {
             model = "openai/gpt-oss-120b",
             messages = new List<Message>
             {
-                new Message { role = "system", content = "You are an educational counselor AI that provides clear, detailed, and encouraging insights about student aptitudes. Keep responses concise and supportive. Do not use emojis." },
+                new Message { role = "system", content = "You are an educational guidance AI. Provide clear, simple, and encouraging insights about the student's strengths and aptitudes. If the results indicate potential fit for other strands, mention them as additional recommendations. Keep responses concise, supportive, short and easy to understand. Do not use emojis."  },
                 new Message { role = "user", content = prompt }
             }
         };
@@ -790,7 +1142,7 @@ public class ExamResultSceneController : MonoBehaviour
                 }
             }
 
-            // load the audio file using UnityWebRequestMultimedia (more robust than WWW)
+            // load the audio file using UnityWebRequestMultimedia
             using (UnityWebRequest www = UnityWebRequestMultimedia.GetAudioClip("file://" + outputPath, AudioType.WAV))
             {
                 yield return www.SendWebRequest();
@@ -846,23 +1198,19 @@ public class ExamResultSceneController : MonoBehaviour
         }
     }
 
-
     private AudioClip AdjustAudioClipVolume(AudioClip originalClip, float volumeMultiplier)
     {
         if (originalClip == null || volumeMultiplier >= 0.99f)
             return originalClip;
 
-        // Get the audio data
         float[] samples = new float[originalClip.samples * originalClip.channels];
         originalClip.GetData(samples, 0);
 
-        // Apply volume multiplier
         for (int i = 0; i < samples.Length; i++)
         {
             samples[i] *= volumeMultiplier;
         }
 
-        // Create new clip with adjusted volume
         AudioClip adjustedClip = AudioClip.Create(
             originalClip.name + "_Adjusted",
             originalClip.samples,
@@ -924,23 +1272,46 @@ public class ExamResultSceneController : MonoBehaviour
 
         yield return StartCoroutine(PanelOutroAnimation());
 
+        // hide subtitle when panel closes
+        SetSubtitle("");
+
         isClosingPanel = false;
     }
 
-    private IEnumerator PlayBotSpeech(AudioClip audioClip)
+    // can take timeline + fallback subtitle text
+    private IEnumerator PlayBotSpeech(AudioClip audioClip, TimedSubtitle[] timeline = null, string fallbackSubtitle = null)
     {
         if (botAudio != null && audioClip != null)
         {
             botAudio.clip = audioClip;
             botAudio.Play();
             Debug.Log($"Playing audio: {audioClip.name}");
+
+            if (timeline != null && timeline.Length > 0)
+            {
+                StartSubtitleTimeline(timeline, botAudio);
+            }
+            else if (!string.IsNullOrEmpty(fallbackSubtitle))
+            {
+                SetSubtitle(fallbackSubtitle, audioClip.length + subtitleClearExtraDelay);
+            }
+
             yield return StartCoroutine(BotTalkAnimationWithAudio());
+
+            // When audio is done, stop any timeline and hide subtitles
+            StopSubtitleTimeline();
         }
         else
         {
             Debug.LogWarning("No audio clip assigned or AudioSource missing!");
+            if (!string.IsNullOrEmpty(fallbackSubtitle))
+            {
+                SetSubtitle(fallbackSubtitle, 2f + subtitleClearExtraDelay);
+            }
+
             float duration = 2f;
             yield return StartCoroutine(BotTalkAnimation(duration));
+            HideSubtitleUI();
         }
     }
 
