@@ -505,9 +505,11 @@ public class ExamManager : MonoBehaviour
             // Save joined titles in one PlayerPref (joined by "||")
             string joinedTitles = string.Join("||", distinct.Select(c => c.title).Take(50));
             PlayerPrefs.SetString("RIASEC_CareerRecommendations", joinedTitles);
+            Debug.Log($"RIASEC_CareerRecommendations, {joinedTitles}");
 
             // Save top career separately
             PlayerPrefs.SetString("RIASEC_TopCareer", distinct[0].title ?? "");
+            Debug.Log($"RIASEC_TopCareer, {distinct[0].title} ?? '' ");
         }
         else
         {

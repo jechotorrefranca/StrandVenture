@@ -31,6 +31,9 @@ public class LoadingManager : MonoBehaviour
 
     void Start()
     {
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+
         nextSceneName = SceneLoader.GetNextScene();
 
         InitializeShuffledLists();
