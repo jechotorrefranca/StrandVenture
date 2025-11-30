@@ -897,6 +897,15 @@ public class ExamResultSceneController : MonoBehaviour
         string topStrandList = (topStrands.Count > 0) ? string.Join(", ", topStrands) : "Unknown";
         resultsData += $"\nHighest Score: {topStrandList} ({topFilledPercent:F1}%)";
 
+        Debug.Log("AAAAAAAAAAA");
+        Debug.Log("Top Strand(s): " + topStrandList);
+        PlayerPrefs.SetString("TopStrand", topStrandList);
+        PlayerPrefs.Save();
+
+        // PlayerPrefs.SetString("RIASEC_TopStrand", topStrandList);
+        // PlayerPrefs.SetString("RIASEC_TopStrandPercent", resultsData);
+
+
         string prompt = $"{resultsData}\n\nBased on these results, give your AI opinion on which track the student is best suited for and explain why in simple short sentences and terms, keep it short and not too long.";
 
         ChatRequest chatRequest = new ChatRequest

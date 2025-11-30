@@ -802,7 +802,7 @@ public class ChooseStrandManager : MonoBehaviour
         if (selectButton != null) selectButton.interactable = false;
         if (finishButton != null) finishButton.interactable = false;
 
-        string sceneName = "TitleScreen";
+        string sceneName = "JobExpoScene";
         Debug.Log($"Finish clicked. Loading Scene: {sceneName}");
 
         if (fadeOverlay != null)

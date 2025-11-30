@@ -2943,9 +2943,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   strands:
   - name: TVL
-    description: Develop essential life and career skills in hospitality, tourism,
-      and culinary arts. Perfect for students aspiring to become chefs, nutritionists,
-      fashion designers, or entrepreneurs in service industries.
+    description: Build hands-on technical skills in hospitality, tourism, and culinary
+      arts. Ideal for students aiming to become chefs, bakers, baristas, service
+      crew, tour guides, or future professionals in the food and service industries
     cardObject: {fileID: 895834039}
     outlineTarget: {fileID: 126400039}
     bestBadge: {fileID: 95837477}
@@ -3015,8 +3015,14 @@ MonoBehaviour:
   subtitleClearExtraDelay: 0.5
   introSubtitles:
   - startTime: 0
-    duration: 2
-    text: sfafafadf
+    duration: 1.9
+    text: It's not just about scores
+  - startTime: 2
+    duration: 3.5
+    text: Choose the path that makes you feel alive, take a moment,
+  - startTime: 5.6
+    duration: 4
+    text: follow your curiosity, and it may lead you to where you truly belong
   bestStrandGlowColor: {r: 1, g: 0.9900545, b: 0.6179246, a: 1}
   bestStrandGlowDistance: 1
 --- !u!4 &1598686995
