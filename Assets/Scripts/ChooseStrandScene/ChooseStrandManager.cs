@@ -14,6 +14,18 @@ public class ChooseStrandManager : MonoBehaviour
         [TextArea]
         public string description;
         public GameObject cardObject;
+
+        [Header("Highlight / Badge (optional)")]
+        public Graphic outlineTarget;   // UI element to glow (Image/Text/etc); if null, will auto-find
+        public GameObject bestBadge;    // e.g. crown/star icon shown only for best strand(s)
+    }
+
+    [System.Serializable]
+    public class TimedSubtitle
+    {
+        public float startTime;   // seconds from start of audio
+        public float duration;    // how long to show this line
+        [TextArea] public string text;
     }
 
     [Header("Strand Configuration")]
@@ -37,7 +49,7 @@ public class ChooseStrandManager : MonoBehaviour
     public Button leftButton;
     public Button rightButton;
     public Button selectButton;
-    public Button finishButton; // <-- NEW: finish button reference
+    public Button finishButton; // finish button reference
     public TMP_Text descriptionText;
     public GameObject carouselContainer;
 
@@ -58,12 +70,26 @@ public class ChooseStrandManager : MonoBehaviour
     public float botFloatSpeed = 2f;
     public float carouselFadeInDuration = 0.8f;
 
+    [Header("Subtitles")]
+    public TMP_Text subtitleText;
+    public GameObject subtitleBackground;
+    public float subtitleClearExtraDelay = 0.5f;
+    public TimedSubtitle[] introSubtitles;   // manual timeline for intro clip
+
+    [Header("Best Strand Highlight")]
+    public Color bestStrandGlowColor = Color.white;
+    public float bestStrandGlowDistance = 3f;
+
     private int currentIndex = 0;
     private bool isAnimating = false;
     private bool introComplete = false;
     private AudioSource audioSource;
     private Vector3 botOriginalPosition;
     private Coroutine floatingCoroutine;
+
+    // subtitle state
+    private Coroutine subtitleCoroutine;
+    private Coroutine subtitleTimelineCoroutine;
 
     private void Start()
     {
@@ -78,6 +104,18 @@ public class ChooseStrandManager : MonoBehaviour
         audioSource = gameObject.AddComponent<AudioSource>();
         audioSource.playOnAwake = false;
 
+        // Subtitles start hidden
+        if (subtitleText != null)
+        {
+            subtitleText.text = "";
+            subtitleText.gameObject.SetActive(false);
+        }
+        if (subtitleBackground != null)
+        {
+            subtitleBackground.SetActive(false);
+        }
+
+        // Sort strands and apply best glow/badges
         SortStrandsByBest();
 
         if (carouselContainer != null)
@@ -168,6 +206,12 @@ public class ChooseStrandManager : MonoBehaviour
             audioSource.clip = botIntroClip;
             audioSource.Play();
 
+            // Subtitles for intro (using array with timestamps)
+            if (introSubtitles != null && introSubtitles.Length > 0)
+            {
+                StartSubtitleTimeline(introSubtitles, audioSource);
+            }
+
             if (botImage != null && botTalkingSprite != null && botIdleSprite != null)
             {
                 StartCoroutine(AnimateBotSpeaking());
@@ -185,6 +229,9 @@ public class ChooseStrandManager : MonoBehaviour
             {
                 botImage.transform.localPosition = botOriginalPosition;
             }
+
+            // stop subtitles after intro
+            StopSubtitleTimeline();
         }
 
         if (botImage != null && botIdleSprite != null)
@@ -262,7 +309,7 @@ public class ChooseStrandManager : MonoBehaviour
         if (finishButton != null)
         {
             finishButton.interactable = true;
-            finishButton.onClick.AddListener(OnFinishClicked); // <-- NEW: hook finish button
+            finishButton.onClick.AddListener(OnFinishClicked);
         }
 
         introComplete = true;
@@ -360,36 +407,83 @@ public class ChooseStrandManager : MonoBehaviour
         if (botImage == null) Debug.LogWarning("Bot Image is not assigned - bot animation will be skipped");
         if (botIntroClip == null) Debug.LogWarning("Bot Intro Clip is not assigned - audio will be skipped");
 
+        // subtitles are optional; just warn if text is missing but background exists, etc
+        if (subtitleBackground != null && subtitleText == null)
+        {
+            Debug.LogWarning("Subtitle background assigned but Subtitle Text is missing.");
+        }
+
         return isValid;
     }
 
+    /// <summary>
+    /// Sorts strands so the ones with the highest Strand_{name}_Percent come first,
+    /// supports ties (multiple best), applies glow & best badge, and logs the result.
+    /// </summary>
     private void SortStrandsByBest()
     {
-        string bestStrands = PlayerPrefs.GetString("BestStrand", "");
-        if (string.IsNullOrEmpty(bestStrands)) return;
+        if (strands == null || strands.Count == 0)
+            return;
 
-        string[] bestArray = bestStrands.Split(',');
-        List<StrandInfo> bestList = new List<StrandInfo>();
-        List<StrandInfo> restList = new List<StrandInfo>();
+        List<string> bestNames = new List<string>();
+        float bestPercent = 0f;
 
+        // Find best percent (ties allowed), using PlayerPrefs values from previous results scene
         foreach (var strand in strands)
         {
-            bool isBest = false;
-            foreach (var best in bestArray)
+            float percent = Mathf.Max(
+                0f,
+                PlayerPrefs.GetFloat($"Strand_{strand.name}_Percent", 0f)
+            );
+
+            Debug.Log($"ChooseStrandManager: Strand {strand.name} has {percent:F1}%");
+
+            if (percent > bestPercent + 0.01f)
             {
-                if (strand.name.Trim().Equals(best.Trim(), System.StringComparison.OrdinalIgnoreCase))
-                {
-                    bestList.Add(strand);
-                    isBest = true;
-                    break;
-                }
+                bestPercent = percent;
+                bestNames.Clear();
+                if (percent > 0f)
+                    bestNames.Add(strand.name);
             }
-            if (!isBest) restList.Add(strand);
+            else if (Mathf.Approximately(percent, bestPercent) && percent > 0f)
+            {
+                if (!bestNames.Contains(strand.name))
+                    bestNames.Add(strand.name);
+            }
         }
 
-        strands.Clear();
-        strands.AddRange(bestList);
-        strands.AddRange(restList);
+        // Debug log for best strands
+        if (bestNames.Count == 0 || bestPercent <= 0f)
+        {
+            Debug.Log("ChooseStrandManager: No best strand found (all Strand_*_Percent are 0 or missing).");
+        }
+        else
+        {
+            string joined = string.Join(", ", bestNames);
+            Debug.Log($"ChooseStrandManager: Best strand(s) = {joined} at {bestPercent:F1}%.");
+        }
+
+        // Reorder strands so best come first
+        if (bestNames.Count > 0 && bestPercent > 0f)
+        {
+            List<StrandInfo> bestList = new List<StrandInfo>();
+            List<StrandInfo> restList = new List<StrandInfo>();
+
+            foreach (var strand in strands)
+            {
+                if (bestNames.Contains(strand.name))
+                    bestList.Add(strand);
+                else
+                    restList.Add(strand);
+            }
+
+            strands.Clear();
+            strands.AddRange(bestList);
+            strands.AddRange(restList);
+        }
+
+        // Apply glow outline and badge to best strands (multiple or none)
+        ApplyBestStrandGlow(bestNames);
     }
 
     private void UpdateCarouselInstant()
@@ -642,7 +736,7 @@ public class ChooseStrandManager : MonoBehaviour
         if (leftButton != null) leftButton.interactable = false;
         if (rightButton != null) rightButton.interactable = false;
         if (selectButton != null) selectButton.interactable = false;
-        if (finishButton != null) finishButton.interactable = false; // disable finish as well
+        if (finishButton != null) finishButton.interactable = false;
 
         string selectedStrand = strands[currentIndex].name;
         string sceneName = selectedStrand + "Scene";
@@ -693,14 +787,12 @@ public class ChooseStrandManager : MonoBehaviour
         }
     }
 
-    // NEW: public handler for finish button
     public void OnFinishClicked()
     {
         if (isAnimating) return;
         StartCoroutine(FinishAndTransition());
     }
 
-    // NEW: loads TitleScreen with fade, similar to SelectAndTransition
     private IEnumerator FinishAndTransition()
     {
         isAnimating = true;
@@ -759,6 +851,203 @@ public class ChooseStrandManager : MonoBehaviour
         if (leftButton != null) leftButton.onClick.RemoveListener(ShowPrevious);
         if (rightButton != null) rightButton.onClick.RemoveListener(ShowNext);
         if (selectButton != null) selectButton.onClick.RemoveListener(OnSelectClicked);
-        if (finishButton != null) finishButton.onClick.RemoveListener(OnFinishClicked); // remove listener
+        if (finishButton != null) finishButton.onClick.RemoveListener(OnFinishClicked);
+    }
+
+    // ---------- SUBTITLE HELPERS (for this scene) ----------
+
+    private void SetSubtitle(string text, float autoClearAfterSeconds = -1f)
+    {
+        if (subtitleText == null) return;
+
+        StopSubtitleTimeline();
+
+        if (subtitleCoroutine != null)
+        {
+            StopCoroutine(subtitleCoroutine);
+            subtitleCoroutine = null;
+        }
+
+        if (string.IsNullOrEmpty(text))
+        {
+            HideSubtitleUI();
+            return;
+        }
+
+        ShowSubtitleUI(text);
+
+        if (autoClearAfterSeconds > 0f)
+        {
+            subtitleCoroutine = StartCoroutine(ClearSubtitleAfterDelay(autoClearAfterSeconds));
+        }
+    }
+
+    private IEnumerator ClearSubtitleAfterDelay(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        HideSubtitleUI();
+    }
+
+    private void ShowSubtitleUI(string text)
+    {
+        if (subtitleText == null) return;
+
+        subtitleText.text = text;
+        subtitleText.gameObject.SetActive(true);
+        if (subtitleBackground != null)
+            subtitleBackground.SetActive(true);
+    }
+
+    private void HideSubtitleUI()
+    {
+        if (subtitleText != null)
+        {
+            subtitleText.text = "";
+            subtitleText.gameObject.SetActive(false);
+        }
+        if (subtitleBackground != null)
+            subtitleBackground.SetActive(false);
+    }
+
+    private void StartSubtitleTimeline(TimedSubtitle[] timeline, AudioSource source)
+    {
+        if (timeline == null || timeline.Length == 0 || source == null) return;
+
+        if (subtitleTimelineCoroutine != null)
+        {
+            StopCoroutine(subtitleTimelineCoroutine);
+        }
+        subtitleTimelineCoroutine = StartCoroutine(SubtitleTimelineRoutine(timeline, source));
+    }
+
+    private void StopSubtitleTimeline()
+    {
+        if (subtitleTimelineCoroutine != null)
+        {
+            StopCoroutine(subtitleTimelineCoroutine);
+            subtitleTimelineCoroutine = null;
+        }
+        HideSubtitleUI();
+    }
+
+    private IEnumerator SubtitleTimelineRoutine(TimedSubtitle[] timeline, AudioSource source)
+    {
+        if (timeline == null || timeline.Length == 0 || source == null || source.clip == null)
+            yield break;
+
+        // wait until audio starts
+        while (source.clip != null && !source.isPlaying)
+            yield return null;
+
+        while (source.isPlaying)
+        {
+            float t = source.time;
+            bool hasSubtitle = false;
+
+            for (int i = 0; i < timeline.Length; i++)
+            {
+                float start = Mathf.Max(0f, timeline[i].startTime);
+                float duration = Mathf.Max(0f, timeline[i].duration);
+                float end = start + duration;
+
+                if (t >= start && t < end)
+                {
+                    ShowSubtitleUI(timeline[i].text);
+                    hasSubtitle = true;
+                    break;
+                }
+            }
+
+            if (!hasSubtitle)
+            {
+                HideSubtitleUI();
+            }
+
+            yield return null;
+        }
+
+        HideSubtitleUI();
+        subtitleTimelineCoroutine = null;
+    }
+
+    // ---------- BEST STRAND GLOW & BADGE ----------
+
+    private void ApplyBestStrandGlow(List<string> bestNames)
+    {
+        foreach (var strand in strands)
+        {
+            if (strand.cardObject == null) continue;
+
+            bool isBest = bestNames != null && bestNames.Contains(strand.name);
+
+            // Handle badge visibility
+            if (strand.bestBadge != null)
+            {
+                strand.bestBadge.SetActive(isBest);
+                if (isBest)
+                {
+                    Debug.Log($"ChooseStrandManager: Showing bestBadge for '{strand.name}'.");
+                }
+            }
+            else if (isBest)
+            {
+                Debug.LogWarning($"ChooseStrandManager: '{strand.name}' is best but has no bestBadge assigned.");
+            }
+
+            // Determine which Graphic to outline
+            Graphic targetGraphic = strand.outlineTarget;
+            GameObject targetGO = strand.cardObject;
+
+            if (targetGraphic == null)
+            {
+                // Try to auto-find a Graphic on the card or its children
+                targetGraphic = strand.cardObject.GetComponent<Graphic>();
+                if (targetGraphic == null)
+                {
+                    targetGraphic = strand.cardObject.GetComponentInChildren<Graphic>();
+                }
+                if (targetGraphic != null)
+                {
+                    targetGO = targetGraphic.gameObject;
+                    Debug.Log($"ChooseStrandManager: Auto-found outline Graphic on '{strand.name}' at '{targetGO.name}'.");
+                }
+            }
+            else
+            {
+                targetGO = targetGraphic.gameObject;
+            }
+
+            if (targetGraphic == null)
+            {
+                if (isBest)
+                {
+                    Debug.LogWarning($"ChooseStrandManager: No Graphic found on '{strand.name}' card for outline. " +
+                                     $"Assign 'outlineTarget' in the inspector for this strand.");
+                }
+                continue;
+            }
+
+            Outline outline = targetGO.GetComponent<Outline>();
+
+            if (isBest)
+            {
+                if (outline == null)
+                {
+                    outline = targetGO.AddComponent<Outline>();
+                    Debug.Log($"ChooseStrandManager: Added Outline component to '{targetGO.name}' for strand '{strand.name}'.");
+                }
+                outline.effectColor = bestStrandGlowColor;
+                outline.effectDistance = new Vector2(bestStrandGlowDistance, bestStrandGlowDistance);
+                outline.useGraphicAlpha = false; // make the glow use pure effectColor, not multiply by graphic alpha
+                outline.enabled = true;
+            }
+            else
+            {
+                if (outline != null)
+                {
+                    outline.enabled = false;
+                }
+            }
+        }
     }
 }

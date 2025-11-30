@@ -158,19 +158,31 @@ public class ExamResultSceneController : MonoBehaviour
         // Load pie graph data first so we can know top strands (supporting ties)
         LoadPieGraphData();
 
+        // Compute top filled percent (0–100%)
+        float topFilledPercent = 0f;
+        foreach (var slice in pieSlices)
+        {
+            if (topStrands.Contains(slice.strandName))
+            {
+                float filledPercent = slice.targetFill * 100f;
+                if (filledPercent > topFilledPercent)
+                    topFilledPercent = filledPercent;
+            }
+        }
+
         // Best strand label (supports multiple top strands)
-        if (topStrands.Count == 0 || topStrandPercent <= 0f)
+        if (topStrands.Count == 0 || topFilledPercent <= 0f)
         {
             bestStrandText.text = "Your best strand could not be determined.";
         }
         else if (topStrands.Count == 1)
         {
-            bestStrandText.text = $"Your best strand is: {topStrands[0]} ({topStrandPercent:F1}%)";
+            bestStrandText.text = $"Your best strand is: {topStrands[0]} ({topFilledPercent:F1}%)";
         }
         else
         {
             string joined = string.Join(", ", topStrands);
-            bestStrandText.text = $"Your best strands are: {joined} ({topStrandPercent:F1}%)";
+            bestStrandText.text = $"Your best strands are: {joined} ({topFilledPercent:F1}%)";
         }
 
         // Apply glow to all top strands
@@ -865,15 +877,25 @@ public class ExamResultSceneController : MonoBehaviour
         // Use strand percents
         foreach (var slice in pieSlices)
         {
-            string strand = slice.strandName;
-            float percent = PlayerPrefs.GetFloat($"Strand_{strand}_Percent", 0f);
-            resultsData += $"- {strand}: {percent:F1}%\n";
-            Debug.Log($"Strand {strand} percent (for AI): {percent:F1}%");
+            float filledPercent = slice.targetFill * 100f;
+            resultsData += $"- {slice.strandName}: {filledPercent:F1}%\n";
+            Debug.Log($"Strand {slice.strandName} filled percent (for AI): {filledPercent:F1}% (targetFill={slice.targetFill:F3})");
         }
 
-        // Use topStrandPercent / list we already computed
+        // Compute highest filled percent among the top strands
+        float topFilledPercent = 0f;
+        foreach (var slice in pieSlices)
+        {
+            if (topStrands.Contains(slice.strandName))
+            {
+                float filledPercent = slice.targetFill * 100f;
+                if (filledPercent > topFilledPercent)
+                    topFilledPercent = filledPercent;
+            }
+        }
+
         string topStrandList = (topStrands.Count > 0) ? string.Join(", ", topStrands) : "Unknown";
-        resultsData += $"\nHighest Score: {topStrandList} ({topStrandPercent:F1}%)";
+        resultsData += $"\nHighest Score: {topStrandList} ({topFilledPercent:F1}%)";
 
         string prompt = $"{resultsData}\n\nBased on these results, give your AI opinion on which track the student is best suited for and explain why in simple short sentences and terms, keep it short and not too long.";
 
