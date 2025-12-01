@@ -99,6 +99,8 @@ public class InteractableNPC : MonoBehaviour
     // Prompt coroutine (scale+fade)
     private Coroutine promptCoroutine;
 
+    public static bool GlobalInteractionLocked = false;
+
     void Start()
     {
         // CRITICAL FIX: Ensure each NPC has its own AudioSource
@@ -246,15 +248,14 @@ public class InteractableNPC : MonoBehaviour
             }
         }
 
+        // If the chat panel is open, conversation logic takes over
         if (panelOpen)
         {
-            // Allow quick exit with Q
             if (Keyboard.current != null && Keyboard.current.tabKey.wasPressedThisFrame)
             {
                 StartCoroutine(CloseConversation());
             }
 
-            // If the panel is open and the player clicks the mouse, ensure the input field is selected
             if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
             {
                 if (playerInputField != null && EventSystem.current != null)
@@ -267,7 +268,29 @@ public class InteractableNPC : MonoBehaviour
             return;
         }
 
-        // Raycast from camera forward — use playerCamera (like your InteractionManager)
+        // 🔒 NEW: Global lock from the bot intro.
+        if (GlobalInteractionLocked)
+        {
+            if (playerLooking)
+            {
+                playerLooking = false;
+                HidePrompt();
+            }
+            return;
+        }
+
+        // 🔒 NEW: Don't interfere with bot interactions
+        if (ExpoBotInteraction.BotIsTalkingGlobal)
+        {
+            if (playerLooking)
+            {
+                playerLooking = false;
+                HidePrompt();
+            }
+            return;
+        }
+
+        // Raycast from camera forward
         if (playerCamera == null) return;
 
         Ray r = new Ray(playerCamera.transform.position, playerCamera.transform.forward);
@@ -277,12 +300,11 @@ public class InteractableNPC : MonoBehaviour
 
         if (didHit && hit.collider != null)
         {
-            // Accept root or child colliders (covers imported models with colliders on children)
             bool hitThis = (hit.collider.gameObject == this.gameObject) || hit.collider.transform.IsChildOf(this.transform);
 
             if (hitThis)
             {
-                // Optional LOS (line-of-sight) check: make sure nothing else is between camera and NPC center
+                // LOS check
                 bool blocked = false;
                 Vector3 dirToNpc = (transform.position - playerCamera.transform.position);
                 float distToNpc = dirToNpc.magnitude;
@@ -301,21 +323,22 @@ public class InteractableNPC : MonoBehaviour
                     if (!playerLooking)
                     {
                         playerLooking = true;
-                        UpdatePromptText("Press <E> to talk");
-                        ShowPrompt("Press <E> to talk");
                     }
+
+                    // ALWAYS show prompt every frame while looking
+                    ShowPrompt("Press <E> to talk");
 
                     if (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame)
                     {
                         StartCoroutine(BeginConversation());
                     }
 
-                    return; // early out so we don't immediately clear the prompt below
+                    return;
                 }
             }
         }
 
-        // if we get here, we are not looking at the NPC (or LOS blocked)
+        // Not looking at NPC
         if (playerLooking)
         {
             playerLooking = false;
@@ -330,19 +353,28 @@ public class InteractableNPC : MonoBehaviour
 
     void ShowPrompt(string text)
     {
-        UpdatePromptText(text);
         if (promptCanvasGroup == null) return;
 
-        if (promptCoroutine != null) StopCoroutine(promptCoroutine);
-        promptCoroutine = StartCoroutine(FadeAndScalePrompt(1f, promptFadeDuration, promptTargetScale));
+        UpdatePromptText(text);
+
+        // Force show immediately - no coroutines
+        promptCanvasGroup.gameObject.SetActive(true);
+        promptCanvasGroup.alpha = 1f;
+        promptCanvasGroup.transform.localScale = promptTargetScale;
+        promptCanvasGroup.interactable = true;
+        promptCanvasGroup.blocksRaycasts = true;
     }
 
     void HidePrompt()
     {
         if (promptCanvasGroup == null) return;
 
-        if (promptCoroutine != null) StopCoroutine(promptCoroutine);
-        promptCoroutine = StartCoroutine(FadeAndScalePrompt(0f, promptFadeDuration, Vector3.one * 0.9f));
+        // Immediate hide
+        promptCanvasGroup.alpha = 0f;
+        promptCanvasGroup.transform.localScale = Vector3.one * 0.9f;
+        promptCanvasGroup.gameObject.SetActive(false);
+        promptCanvasGroup.interactable = false;
+        promptCanvasGroup.blocksRaycasts = false;
     }
 
     IEnumerator FadeAndScalePrompt(float targetAlpha, float duration, Vector3 targetScale)
