@@ -56,6 +56,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/ChooseStrand.unity
     guid: 33b071a2963e6934d9c73f903c96e63a
+  - enabled: 1
+    path: Assets/Scenes/ThankYouScene.unity
+    guid: 05eb1e1962eac7d4e97ee2207493c273
   m_configObjects:
     com.unity.input.settings: {fileID: 11400000, guid: 9e7be553448fa2546aea5752021cbcf7,
       type: 2}

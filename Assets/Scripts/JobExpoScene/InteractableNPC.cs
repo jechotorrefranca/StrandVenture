@@ -11,19 +11,36 @@ using UnityEngine.InputSystem;
 using TMPro;
 using UnityEngine.EventSystems;
 
-/* * InteractableNPC.cs (Fixed - v5)
+/* * InteractableNPC.cs (with subtitles)
  * ------------------ 
- * Fix: Ensure ONLY the active NPC plays audio by:
- * 1. Stopping all audio on the AudioSource before playing new clips
- * 2. Checking isInConversation flag before playing audio
- * 3. Creating AudioSource dynamically if not assigned to ensure each NPC has its own
+ * - Each NPC has its own AudioSource
+ * - Intro uses manual SubtitleSegment timeline
+ * - Groq + Piper replies use auto-generated subtitles
+ * - Background and subtitle text appear together
  */
+
 public class InteractableNPC : MonoBehaviour
 {
+    [Serializable]
+    public class SubtitleSegment
+    {
+        [Tooltip("Seconds from clip start when this subtitle appears")]
+        public float timestamp;
+
+        [TextArea(1, 4)]
+        public string text;
+
+        [Tooltip("Duration in seconds (0 = auto until next segment or clip end)")]
+        public float duration;
+
+        [Tooltip("Background color for this subtitle segment (RGBA)")]
+        public Color backgroundColor = new Color(0f, 0f, 0f, 0.85f);
+    }
+
     [Header("Interaction")]
     public float interactDistance = 3f;
     public LayerMask obstructionMask = ~0; // used for LOS check
-    public LayerMask gazeLayer = ~0;      // which layers the gaze raycast should hit (like InteractionManager.interactableLayer)
+    public LayerMask gazeLayer = ~0;      // which layers the gaze raycast should hit
     public float gazeMaxDistance = 3f;
     public string profession = "doctor";
 
@@ -71,9 +88,24 @@ public class InteractableNPC : MonoBehaviour
     [Header("Crosshair")]
     public GameObject crosshair; // will be hidden when interacting
 
-    // Allow explicit camera assignment (matches your InteractionManager)
     [Header("Camera")]
     public Camera playerCamera;
+
+    [Header("Subtitle UI")]
+    public GameObject subtitlePanel;     // parent panel for subtitle
+    public Image subtitleBackground;     // background image
+    public TMP_Text subtitleText;        // subtitle text
+
+    [Header("Intro Subtitles (manual)")]
+    [Tooltip("Timeline for the greetingClip audio")]
+    public SubtitleSegment[] introSubtitles;
+
+    [Header("AI Subtitles (Groq + Piper)")]
+    [Tooltip("Background color for AI-generated reply subtitles")]
+    public Color aiSubtitleBackgroundColor = new Color(0f, 0f, 0f, 0.85f);
+
+    [Tooltip("Max words per subtitle line for AI replies")]
+    public int aiWordsPerSubtitle = 7;
 
     // internal state
     private bool playerLooking = false;
@@ -94,16 +126,18 @@ public class InteractableNPC : MonoBehaviour
     private Quaternion initialRotation;
     private bool isInConversation = false;
     private Coroutine animationIntervalCoroutine;
-    private Coroutine fadeCoroutine;
 
     // Prompt coroutine (scale+fade)
     private Coroutine promptCoroutine;
+
+    // Subtitle coroutine
+    private Coroutine subtitleCoroutine;
 
     public static bool GlobalInteractionLocked = false;
 
     void Start()
     {
-        // CRITICAL FIX: Ensure each NPC has its own AudioSource
+        // Ensure each NPC has its own AudioSource
         if (npcAudioSource == null)
         {
             npcAudioSource = gameObject.AddComponent<AudioSource>();
@@ -115,16 +149,14 @@ public class InteractableNPC : MonoBehaviour
         }
         else
         {
-            // Ensure existing AudioSource is configured correctly
             npcAudioSource.playOnAwake = false;
             Debug.Log($"[{gameObject.name}] Using assigned AudioSource");
         }
 
-        // camera resolution: prefer explicit playerCamera (like your InteractionManager), fallback to Camera.main
+        // camera resolution
         if (playerCamera == null && Camera.main != null)
             playerCamera = Camera.main;
 
-        // If playerCamera still null, try finding a Camera in playerHead or playerRoot
         if (playerCamera == null && playerHead != null)
         {
             var cam = playerHead.GetComponentInChildren<Camera>();
@@ -142,7 +174,7 @@ public class InteractableNPC : MonoBehaviour
             fpsController = playerRoot.GetComponent<FirstPersonCameraMovement>();
         }
 
-        // Setup UI initial states
+        // Prompt UI initial state
         if (promptCanvasGroup != null)
         {
             promptCanvasGroup.alpha = 0f;
@@ -150,6 +182,7 @@ public class InteractableNPC : MonoBehaviour
             promptCanvasGroup.gameObject.SetActive(false);
         }
 
+        // Chat panel initial state
         if (panelCanvasGroup != null)
         {
             panelCanvasGroup.alpha = 0f;
@@ -170,6 +203,17 @@ public class InteractableNPC : MonoBehaviour
             playerInputField.onSubmit.AddListener(OnInputSubmit);
         }
 
+        // Subtitle UI initial state
+        if (subtitlePanel != null)
+            subtitlePanel.SetActive(false);
+        if (subtitleBackground != null)
+        {
+            subtitleBackground.enabled = false;
+            subtitleBackground.gameObject.SetActive(false);
+        }
+        if (subtitleText != null)
+            subtitleText.text = "";
+
         LoadGroqApiKey();
         InitializePiperPaths();
 
@@ -179,11 +223,9 @@ public class InteractableNPC : MonoBehaviour
         // Ensure Animation component exists if clips are used
         if (npcAnimation == null && (idleAnimationClip != null || conversationAnimationClip != null))
         {
-            // Try to get one from the same GameObject
             npcAnimation = GetComponent<Animation>();
             if (npcAnimation == null)
             {
-                // create one so we can play legacy clips
                 npcAnimation = gameObject.AddComponent<Animation>();
             }
         }
@@ -197,7 +239,7 @@ public class InteractableNPC : MonoBehaviour
                 npcAnimation.AddClip(conversationAnimationClip, conversationAnimationClip.name);
         }
 
-        // Start idle animation (ensure it stays active when not interacting)
+        // Start idle animation
         if (npcAnimation != null && idleAnimationClip != null)
         {
             ForcePlayIdle();
@@ -224,21 +266,21 @@ public class InteractableNPC : MonoBehaviour
         else
             Debug.LogWarning("groq_config.json not found at " + path);
     }
+
     private void InitializePiperPaths()
     {
         piperPath = Path.Combine(Application.streamingAssetsPath, piperRelativePath);
         voicesDir = Path.Combine(Application.streamingAssetsPath, voicesRelativeDir);
     }
 
-
     void Update()
     {
-        // Handle player detection and rotation (always, unless in conversation)
+        // Player detection and rotation (always, unless in conversation)
         if (!isInConversation)
         {
             HandlePlayerTracking();
 
-            // Ensure idle animation keeps playing while not in conversation (legacy Animation)
+            // Ensure idle animation keeps playing while not in conversation
             if (npcAnimation != null && idleAnimationClip != null)
             {
                 if (!npcAnimation.IsPlaying(idleAnimationClip.name))
@@ -268,7 +310,7 @@ public class InteractableNPC : MonoBehaviour
             return;
         }
 
-        // 🔒 NEW: Global lock from the bot intro.
+        // Global lock from the bot intro
         if (GlobalInteractionLocked)
         {
             if (playerLooking)
@@ -279,7 +321,7 @@ public class InteractableNPC : MonoBehaviour
             return;
         }
 
-        // 🔒 NEW: Don't interfere with bot interactions
+        // Don't interfere with bot interactions
         if (ExpoBotInteraction.BotIsTalkingGlobal)
         {
             if (playerLooking)
@@ -325,7 +367,7 @@ public class InteractableNPC : MonoBehaviour
                         playerLooking = true;
                     }
 
-                    // ALWAYS show prompt every frame while looking
+                    // Show prompt while looking
                     ShowPrompt("Press <E> to talk");
 
                     if (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame)
@@ -357,7 +399,6 @@ public class InteractableNPC : MonoBehaviour
 
         UpdatePromptText(text);
 
-        // Force show immediately - no coroutines
         promptCanvasGroup.gameObject.SetActive(true);
         promptCanvasGroup.alpha = 1f;
         promptCanvasGroup.transform.localScale = promptTargetScale;
@@ -369,7 +410,6 @@ public class InteractableNPC : MonoBehaviour
     {
         if (promptCanvasGroup == null) return;
 
-        // Immediate hide
         promptCanvasGroup.alpha = 0f;
         promptCanvasGroup.transform.localScale = Vector3.one * 0.9f;
         promptCanvasGroup.gameObject.SetActive(false);
@@ -417,9 +457,9 @@ public class InteractableNPC : MonoBehaviour
         {
             // Look at player (Y-axis only)
             Vector3 directionToPlayer = playerHead.position - transform.position;
-            directionToPlayer.y = 0; // Keep on horizontal plane
+            directionToPlayer.y = 0;
 
-            if (directionToPlayer.sqrMagnitude > 0.001f) // Use sqrMagnitude for better performance
+            if (directionToPlayer.sqrMagnitude > 0.001f)
             {
                 Quaternion targetRotation = Quaternion.LookRotation(directionToPlayer);
                 transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
@@ -436,13 +476,11 @@ public class InteractableNPC : MonoBehaviour
     {
         if (npcAnimation != null && clip != null)
         {
-            // ensure clip exists on the Animation component
             if (npcAnimation.GetClip(clip.name) == null)
                 npcAnimation.AddClip(clip, clip.name);
 
             var state = npcAnimation[clip.name];
             state.wrapMode = loop ? WrapMode.Loop : WrapMode.Once;
-            // Use CrossFade for smoother transitions and to ensure the clip actually starts
             npcAnimation.CrossFade(clip.name, 0.12f);
         }
     }
@@ -451,29 +489,24 @@ public class InteractableNPC : MonoBehaviour
     {
         while (isInConversation)
         {
-            // Play conversation animation
             if (conversationAnimationClip != null)
             {
                 PlayAnimation(conversationAnimationClip, false);
             }
 
-            // Wait for the interval
             yield return new WaitForSeconds(conversationIdleInterval);
 
-            // Play idle animation briefly
             if (idleAnimationClip != null)
             {
                 PlayAnimation(idleAnimationClip, true);
             }
 
-            // Short idle duration before switching back
             yield return new WaitForSeconds(1f);
         }
     }
 
     private void ForcePlayIdle()
     {
-        // Helper to force the idle animation on start / when restoring
         if (npcAnimation == null || idleAnimationClip == null) return;
         try
         {
@@ -481,7 +514,6 @@ public class InteractableNPC : MonoBehaviour
         }
         catch (Exception)
         {
-            // If Play by name fails, ignore silently
         }
     }
 
@@ -520,7 +552,7 @@ public class InteractableNPC : MonoBehaviour
         // Move camera to focus point smoothly
         yield return StartCoroutine(MoveCameraToFocus());
 
-        // Play the prepared greeting AudioClip (user-assigned wav) instead of Piper TTS
+        // Play the prepared greeting AudioClip with manual subtitles
         yield return StartCoroutine(PlayGreetingClip());
 
         // if the player cancelled during the greeting, don't continue to show the panel
@@ -530,7 +562,7 @@ public class InteractableNPC : MonoBehaviour
             yield break;
         }
 
-        // Ensure EventSystem exists (so selection/focus works)
+        // Ensure EventSystem exists
         EnsureEventSystemExists();
 
         // Show chat panel only AFTER greeting finished
@@ -538,14 +570,13 @@ public class InteractableNPC : MonoBehaviour
 
         if (panelCanvasGroup != null)
         {
-            // Make sure the canvas group will accept clicks
             panelCanvasGroup.interactable = true;
             panelCanvasGroup.blocksRaycasts = true;
             panelCanvasGroup.gameObject.SetActive(true);
             yield return StartCoroutine(FadeCanvasGroup(panelCanvasGroup, 1f, 0.2f));
         }
 
-        // Unlock the cursor so the player can click the input field
+        // Unlock cursor
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
 
@@ -563,7 +594,6 @@ public class InteractableNPC : MonoBehaviour
 
         if (sendButton != null) sendButton.interactable = true;
 
-        // Clear any status text
         if (statusText != null) statusText.text = "";
     }
 
@@ -571,44 +601,55 @@ public class InteractableNPC : MonoBehaviour
     {
         if (npcAudioSource == null || greetingClip == null) yield break;
 
-        // CRITICAL FIX: Stop any existing audio before playing
+        // Stop any existing audio & subtitles
         if (npcAudioSource.isPlaying)
         {
             Debug.Log($"[{gameObject.name}] Stopping existing audio before greeting");
             npcAudioSource.Stop();
         }
+        StopSubtitleSequence();
 
         Debug.Log($"[{gameObject.name}] Playing greeting clip");
         npcAudioSource.clip = greetingClip;
         npcAudioSource.Play();
 
+        // Start manual subtitles if configured
+        if (introSubtitles != null && introSubtitles.Length > 0)
+        {
+            subtitleCoroutine = StartCoroutine(PlayManualSubtitleSequence(npcAudioSource, greetingClip, introSubtitles));
+        }
+
         while (npcAudioSource.isPlaying)
         {
-            // allow cancellation while greeting plays
             if (!isInConversation)
             {
                 Debug.Log($"[{gameObject.name}] Greeting cancelled");
                 npcAudioSource.Stop();
-                yield break;
+                break;
             }
             yield return null;
         }
 
         Debug.Log($"[{gameObject.name}] Greeting finished");
+
+        StopSubtitleSequence();
     }
 
     private IEnumerator CloseConversation()
     {
         Debug.Log($"[{gameObject.name}] Closing conversation");
 
-        // CRITICAL FIX: Stop any playing audio immediately
+        // Stop any playing audio
         if (npcAudioSource != null && npcAudioSource.isPlaying)
         {
             Debug.Log($"[{gameObject.name}] Stopping audio on conversation close");
             npcAudioSource.Stop();
         }
 
-        // If panel not yet presented but greeting playing, cancel conversation state so BeginConversation exits early
+        // Stop subtitles
+        StopSubtitleSequence();
+
+        // Cancel conversation state
         isInConversation = false;
 
         // Stop conversation animation
@@ -624,10 +665,9 @@ public class InteractableNPC : MonoBehaviour
             PlayAnimation(idleAnimationClip, true);
         }
 
-        // Hide / disable panel UI so it doesn't receive clicks
+        // Hide / disable panel UI
         if (panelCanvasGroup != null)
         {
-            // disable interaction immediately, then fade out
             panelCanvasGroup.interactable = false;
             panelCanvasGroup.blocksRaycasts = false;
             yield return StartCoroutine(FadeCanvasGroup(panelCanvasGroup, 0f, 0.2f));
@@ -636,7 +676,7 @@ public class InteractableNPC : MonoBehaviour
 
         panelOpen = false;
 
-        // Deselect UI (clear EventSystem selection)
+        // Deselect UI
         if (EventSystem.current != null)
             EventSystem.current.SetSelectedGameObject(null);
 
@@ -658,7 +698,6 @@ public class InteractableNPC : MonoBehaviour
     {
         if (EventSystem.current != null) return;
 
-        // Create a minimal EventSystem so UI selection and clicks work
         var go = new GameObject("EventSystem", new System.Type[] { typeof(EventSystem), typeof(StandaloneInputModule) });
     }
 
@@ -773,11 +812,10 @@ public class InteractableNPC : MonoBehaviour
 
     #endregion
 
-    #region Send / Receive (modified to use unique temp files)
+    #region Send / Receive (Groq + Piper)
 
     private void OnInputSubmit(string text)
     {
-        // Trigger send when Enter is pressed
         OnSendClicked();
     }
 
@@ -788,7 +826,6 @@ public class InteractableNPC : MonoBehaviour
         string msg = playerInputField.text?.Trim();
         if (string.IsNullOrEmpty(msg)) return;
 
-        // Disable input while processing
         playerInputField.interactable = false;
         if (sendButton != null) sendButton.interactable = false;
         if (statusText != null) statusText.text = "Thinking...";
@@ -798,7 +835,6 @@ public class InteractableNPC : MonoBehaviour
 
     private IEnumerator ProcessPlayerMessage(string message)
     {
-        // CRITICAL: Check if still in conversation before processing
         if (!isInConversation)
         {
             Debug.Log($"[{gameObject.name}] Not in conversation, ignoring message");
@@ -807,7 +843,6 @@ public class InteractableNPC : MonoBehaviour
 
         Debug.Log($"[{gameObject.name}] Processing message: {message}");
 
-        // Build concise system prompt
         string system = $"You are a professional {profession}, act like you are being interviewed. Answer the player's question directly and concisely in 1-2 short sentences. If the question is not appropriate, reply appropriately.";
 
         string reply = null;
@@ -816,10 +851,9 @@ public class InteractableNPC : MonoBehaviour
         if (string.IsNullOrEmpty(reply))
             reply = "There is something with the code.";
 
-        // Play reply via Piper (this uses the Piper toolchain). Use a unique temporary filename per NPC/call to avoid cross-talk
+        // Play reply via Piper with auto subtitles
         yield return StartCoroutine(PlayPiperTTS(reply));
 
-        // Re-enable input and UI
         if (statusText != null) statusText.text = "";
         if (playerInputField != null)
         {
@@ -832,7 +866,6 @@ public class InteractableNPC : MonoBehaviour
 
     private IEnumerator PlayPiperTTS(string text)
     {
-        // CRITICAL: Double-check we're still in conversation
         if (!isInConversation)
         {
             Debug.Log($"[{gameObject.name}] Not in conversation, skipping TTS playback");
@@ -845,21 +878,20 @@ public class InteractableNPC : MonoBehaviour
             yield break;
         }
 
-        // CRITICAL FIX: Stop any existing audio before playing new clip
+        // Stop any existing audio
         if (npcAudioSource.isPlaying)
         {
             Debug.Log($"[{gameObject.name}] Stopping existing audio before TTS");
             npcAudioSource.Stop();
         }
 
-        // Create a unique output path per call so multiple NPCs don't overwrite the same file
+        // Unique output per call
         string filename = $"piper_output_{GetInstanceID()}_{DateTime.UtcNow.Ticks}.wav";
         string outputPath = Path.Combine(Application.persistentDataPath, filename);
 
         Debug.Log($"[{gameObject.name}] Generating TTS to: {outputPath}");
 
         bool ok = false;
-
         Task<bool> gen = Task.Run(() => GeneratePiperAudio(text, outputPath));
         while (!gen.IsCompleted) yield return null;
         ok = gen.Result;
@@ -870,7 +902,6 @@ public class InteractableNPC : MonoBehaviour
             yield break;
         }
 
-        // CRITICAL: Check again if still in conversation before loading/playing
         if (!isInConversation)
         {
             Debug.Log($"[{gameObject.name}] Conversation ended before audio loaded, cleaning up");
@@ -878,7 +909,6 @@ public class InteractableNPC : MonoBehaviour
             yield break;
         }
 
-        // Load audio
         string uri = "file://" + outputPath;
         using (UnityWebRequest www = UnityWebRequestMultimedia.GetAudioClip(uri, AudioType.WAV))
         {
@@ -887,7 +917,7 @@ public class InteractableNPC : MonoBehaviour
 #if UNITY_2020_1_OR_NEWER
             if (www.result != UnityWebRequest.Result.Success)
 #else
-            if (www.isNetworkError || www.isHttpError)
+        if (www.isNetworkError || www.isHttpError)
 #endif
             {
                 Debug.LogError($"[{gameObject.name}] Audio load error: " + www.error);
@@ -903,7 +933,6 @@ public class InteractableNPC : MonoBehaviour
                 yield break;
             }
 
-            // CRITICAL: Final check before playing
             if (!isInConversation)
             {
                 Debug.Log($"[{gameObject.name}] Conversation ended before playback, cleaning up");
@@ -911,16 +940,29 @@ public class InteractableNPC : MonoBehaviour
                 yield break;
             }
 
+            // 🔻 HIDE CHAT PANEL WHILE NPC IS TALKING 🔻
+            bool hadPanel = panelCanvasGroup != null && panelCanvasGroup.gameObject.activeSelf;
+            if (hadPanel && panelCanvasGroup != null)
+            {
+                // fade out quickly so subtitle area is clean
+                panelCanvasGroup.interactable = false;
+                panelCanvasGroup.blocksRaycasts = false;
+                yield return StartCoroutine(FadeCanvasGroup(panelCanvasGroup, 0f, 0.15f));
+            }
+
             Debug.Log($"[{gameObject.name}] Playing TTS audio");
             npcAudioSource.clip = clip;
             npcAudioSource.Play();
+
+            // Start auto subtitles for AI reply
+            StopSubtitleSequence();
+            subtitleCoroutine = StartCoroutine(PlayAutoSubtitleSequence(npcAudioSource, clip, text));
 
             while (npcAudioSource.isPlaying && isInConversation)
             {
                 yield return null;
             }
 
-            // If conversation ended while playing, stop the audio
             if (!isInConversation && npcAudioSource.isPlaying)
             {
                 Debug.Log($"[{gameObject.name}] Conversation ended during playback, stopping");
@@ -929,10 +971,23 @@ public class InteractableNPC : MonoBehaviour
 
             Debug.Log($"[{gameObject.name}] TTS playback finished");
 
-            // optionally delete the temp file after playback to avoid disk piling up
+            // stop subtitles first so they don't overlap the UI reappearing
+            StopSubtitleSequence();
+
+            // 🔺 SHOW CHAT PANEL BACK AFTER SPEECH (if convo still active) 🔺
+            if (isInConversation && hadPanel && panelCanvasGroup != null)
+            {
+                // Ensure root is active again, then fade in
+                panelCanvasGroup.gameObject.SetActive(true);
+                yield return StartCoroutine(FadeCanvasGroup(panelCanvasGroup, 1f, 0.15f));
+                panelCanvasGroup.interactable = true;
+                panelCanvasGroup.blocksRaycasts = true;
+            }
+
             TryDeleteSafe(outputPath);
         }
     }
+
 
     private void TryDeleteSafe(string path)
     {
@@ -948,7 +1003,153 @@ public class InteractableNPC : MonoBehaviour
 
     #endregion
 
-    #region Groq Chat Method (unchanged)
+    #region Subtitle Logic
+
+    private void StopSubtitleSequence()
+    {
+        if (subtitleCoroutine != null)
+        {
+            StopCoroutine(subtitleCoroutine);
+            subtitleCoroutine = null;
+        }
+
+        if (subtitlePanel != null)
+            subtitlePanel.SetActive(false);
+
+        if (subtitleBackground != null)
+        {
+            subtitleBackground.enabled = false;
+            subtitleBackground.gameObject.SetActive(false);
+        }
+
+        if (subtitleText != null)
+            subtitleText.text = "";
+    }
+
+    private IEnumerator PlayManualSubtitleSequence(AudioSource source, AudioClip clip, SubtitleSegment[] segments)
+    {
+        if (source == null || clip == null || segments == null || segments.Length == 0)
+            yield break;
+
+        SubtitleSegment[] sorted = (SubtitleSegment[])segments.Clone();
+        Array.Sort(sorted, (a, b) => a.timestamp.CompareTo(b.timestamp));
+
+        int idx = 0;
+        float clipLength = clip.length;
+
+        while (idx < sorted.Length && source != null && source.isPlaying)
+        {
+            SubtitleSegment seg = sorted[idx];
+
+            // wait until it's time for this segment
+            while (source != null && source.isPlaying && source.time < seg.timestamp)
+            {
+                yield return null;
+            }
+
+            if (source == null || !source.isPlaying)
+                break;
+
+            float segDuration = seg.duration;
+            if (segDuration <= 0f)
+            {
+                if (idx + 1 < sorted.Length)
+                    segDuration = Mathf.Max(0.02f, sorted[idx + 1].timestamp - seg.timestamp);
+                else
+                    segDuration = Mathf.Max(0.02f, clipLength - seg.timestamp);
+            }
+
+            // Show subtitle + background
+            if (subtitlePanel != null) subtitlePanel.SetActive(true);
+            if (subtitleText != null) subtitleText.text = seg.text ?? "";
+
+            if (subtitleBackground != null)
+            {
+                subtitleBackground.gameObject.SetActive(true);
+                subtitleBackground.enabled = true;
+                Color c = seg.backgroundColor;
+                if (c.a <= 0.01f) c.a = 0.85f;
+                subtitleBackground.color = c;
+            }
+
+            float elapsed = 0f;
+            while (elapsed < segDuration && source != null && source.isPlaying)
+            {
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            // Hide between segments
+            if (subtitlePanel != null) subtitlePanel.SetActive(false);
+            if (subtitleBackground != null)
+            {
+                subtitleBackground.enabled = false;
+                subtitleBackground.gameObject.SetActive(false);
+            }
+
+            idx++;
+        }
+
+        StopSubtitleSequence();
+    }
+
+    private IEnumerator PlayAutoSubtitleSequence(AudioSource source, AudioClip clip, string fullText)
+    {
+        if (source == null || clip == null || string.IsNullOrWhiteSpace(fullText))
+            yield break;
+
+        var words = fullText.Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
+        int totalWords = words.Length;
+        if (totalWords == 0) yield break;
+
+        float totalDuration = clip.length;
+        float secondsPerWord = totalDuration / Mathf.Max(1, totalWords);
+
+        int wordIndex = 0;
+
+        while (wordIndex < totalWords && source != null && source.isPlaying && isInConversation)
+        {
+            int count = Mathf.Min(aiWordsPerSubtitle, totalWords - wordIndex);
+
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < count; i++)
+            {
+                if (i > 0) sb.Append(" ");
+                sb.Append(words[wordIndex + i]);
+            }
+            string segText = sb.ToString();
+
+            float segDuration = count * secondsPerWord;
+
+            // Show subtitle + background
+            if (subtitlePanel != null) subtitlePanel.SetActive(true);
+            if (subtitleText != null) subtitleText.text = segText;
+
+            if (subtitleBackground != null)
+            {
+                subtitleBackground.gameObject.SetActive(true);
+                subtitleBackground.enabled = true;
+                Color c = aiSubtitleBackgroundColor;
+                if (c.a <= 0.01f) c.a = 0.85f;
+                subtitleBackground.color = c;
+            }
+
+            float elapsed = 0f;
+            while (elapsed < segDuration && source != null && source.isPlaying && isInConversation)
+            {
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            wordIndex += count;
+        }
+
+        StopSubtitleSequence();
+    }
+
+    #endregion
+
+    #region Groq Chat
 
     private class SerializableKey
     {
@@ -1047,7 +1248,7 @@ public class InteractableNPC : MonoBehaviour
 
     #endregion
 
-    #region Piper TTS engine invocation (unchanged - writes to provided outputPath)
+    #region Piper TTS engine invocation
 
     private bool GeneratePiperAudio(string text, string outputPath)
     {

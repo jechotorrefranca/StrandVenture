@@ -564,6 +564,12 @@ MonoBehaviour:
   rotationSpeed: 5
   crosshair: {fileID: 1519267190}
   playerCamera: {fileID: 487411095}
+  subtitlePanel: {fileID: 0}
+  subtitleBackground: {fileID: 0}
+  subtitleText: {fileID: 0}
+  introSubtitles: []
+  aiSubtitleBackgroundColor: {r: 0, g: 0, b: 0, a: 0.85}
+  aiWordsPerSubtitle: 7
 --- !u!82 &27854634
 AudioSource:
   m_ObjectHideFlags: 0
@@ -1487,6 +1493,12 @@ MonoBehaviour:
   rotationSpeed: 5
   crosshair: {fileID: 1519267190}
   playerCamera: {fileID: 487411095}
+  subtitlePanel: {fileID: 0}
+  subtitleBackground: {fileID: 0}
+  subtitleText: {fileID: 0}
+  introSubtitles: []
+  aiSubtitleBackgroundColor: {r: 0, g: 0, b: 0, a: 0.85}
+  aiWordsPerSubtitle: 7
 --- !u!111 &322007668
 Animation:
   m_ObjectHideFlags: 0
@@ -1939,6 +1951,12 @@ MonoBehaviour:
   rotationSpeed: 5
   crosshair: {fileID: 1519267190}
   playerCamera: {fileID: 487411095}
+  subtitlePanel: {fileID: 0}
+  subtitleBackground: {fileID: 0}
+  subtitleText: {fileID: 0}
+  introSubtitles: []
+  aiSubtitleBackgroundColor: {r: 0, g: 0, b: 0, a: 0.85}
+  aiWordsPerSubtitle: 7
 --- !u!82 &387497512
 AudioSource:
   m_ObjectHideFlags: 0
@@ -8348,6 +8366,12 @@ MonoBehaviour:
   rotationSpeed: 5
   crosshair: {fileID: 1519267190}
   playerCamera: {fileID: 487411095}
+  subtitlePanel: {fileID: 0}
+  subtitleBackground: {fileID: 0}
+  subtitleText: {fileID: 0}
+  introSubtitles: []
+  aiSubtitleBackgroundColor: {r: 0, g: 0, b: 0, a: 0.85}
+  aiWordsPerSubtitle: 7
 --- !u!1001 &1609524154
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -8954,6 +8978,20 @@ MonoBehaviour:
   rotationSpeed: 5
   crosshair: {fileID: 1519267190}
   playerCamera: {fileID: 487411095}
+  subtitlePanel: {fileID: 1403230426}
+  subtitleBackground: {fileID: 102688}
+  subtitleText: {fileID: 344880302}
+  introSubtitles:
+  - timestamp: 0
+    text: 'hello '
+    duration: 1
+    backgroundColor: {r: 0, g: 0, b: 0, a: 0}
+  - timestamp: 1
+    text: intro
+    duration: 1
+    backgroundColor: {r: 0, g: 0, b: 0, a: 0}
+  aiSubtitleBackgroundColor: {r: 0, g: 0, b: 0, a: 0.85}
+  aiWordsPerSubtitle: 10
 --- !u!65 &1709349500
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -10259,6 +10297,12 @@ MonoBehaviour:
   rotationSpeed: 5
   crosshair: {fileID: 1519267190}
   playerCamera: {fileID: 487411095}
+  subtitlePanel: {fileID: 0}
+  subtitleBackground: {fileID: 0}
+  subtitleText: {fileID: 0}
+  introSubtitles: []
+  aiSubtitleBackgroundColor: {r: 0, g: 0, b: 0, a: 0.85}
+  aiWordsPerSubtitle: 7
 --- !u!82 &2004212982
 AudioSource:
   m_ObjectHideFlags: 0
