@@ -2468,13 +2468,88 @@ MonoBehaviour:
   mouthOpenMesh: {fileID: 1609524156}
   mouthClosedMesh: {fileID: 1609524157}
   mouthOpenThreshold: 0.01
-  talkingAudioClip: {fileID: 8300000, guid: 28e627b4b9156b946a2be2bbc39a3f88, type: 3}
+  talkingAudioClip: {fileID: 8300000, guid: eb36d4cc72a7bf8498b9e79ca79fecf1, type: 3}
   interactionTalkingClip: {fileID: 8300000, guid: e31f9e4d2818e2140b35879de37749b6,
     type: 3}
-  finalDialogueClip: {fileID: 8300000, guid: 8bf28b73f01db254b8ef4c407c76ed78, type: 3}
-  introSubtitles: []
-  interactionSubtitles: []
-  finalSubtitles: []
+  finalDialogueClip: {fileID: 8300000, guid: b31815acaef86c94e80872c73b5aa627, type: 3}
+  introSubtitles:
+  - timestamp: 0
+    text: 'Welcome to phase three: Empower'
+    duration: 2.2
+    backgroundColor: {r: 0, g: 0, b: 0, a: 0}
+  - timestamp: 2.25
+    text: Inside this virtual expo hall, you'll find six interactive booths,
+    duration: 4.5
+    backgroundColor: {r: 0, g: 0, b: 0, a: 0}
+  - timestamp: 7
+    text: Each one representing a different academic strand
+    duration: 3
+    backgroundColor: {r: 0, g: 0, b: 0, a: 0}
+  - timestamp: 10
+    text: Explore any booth to discover real-world careers
+    duration: 3
+    backgroundColor: {r: 0, g: 0, b: 0, a: 0}
+  - timestamp: 13
+    text: Industries and opportunities connected to that strand
+    duration: 3
+    backgroundColor: {r: 0, g: 0, b: 0, a: 0}
+  - timestamp: 16
+    text: From ICT and cybersecurity to HUMSS and communication
+    duration: 4
+    backgroundColor: {r: 0, g: 0, b: 0, a: 0}
+  - timestamp: 20
+    text: And everything in between
+    duration: 2
+    backgroundColor: {r: 0, g: 0, b: 0, a: 0}
+  - timestamp: 22
+    text: Take your time exploring
+    duration: 2
+    backgroundColor: {r: 0, g: 0, b: 0, a: 0}
+  - timestamp: 24
+    text: This phase is all about discovering the futures that match your strengths
+      and interests
+    duration: 4.5
+    backgroundColor: {r: 0, g: 0, b: 0, a: 0}
+  - timestamp: 28.5
+    text: When you're done and ready to move on, come back to me for your final reflection
+    duration: 5
+    backgroundColor: {r: 0, g: 0, b: 0, a: 0}
+  - timestamp: 33.5
+    text: It's not a test, just a simple chat about what you learned and which strand
+      you're leaning toward
+    duration: 5
+    backgroundColor: {r: 0, g: 0, b: 0, a: 0}
+  - timestamp: 38.5
+    text: I'll be right here when you're ready
+    duration: 2
+    backgroundColor: {r: 0, g: 0, b: 0, a: 0}
+  interactionSubtitles:
+  - timestamp: 0
+    text: Ready for the reflection interview?
+    duration: 2
+    backgroundColor: {r: 0, g: 0, b: 0, a: 0}
+  - timestamp: 2
+    text: Let's go!
+    duration: 1
+    backgroundColor: {r: 0, g: 0, b: 0, a: 0}
+  finalSubtitles:
+  - timestamp: 0
+    text: And that's it, DYCIan
+    duration: 1.5
+    backgroundColor: {r: 0, g: 0, b: 0, a: 0}
+  - timestamp: 1.5
+    text: Your StrandVenture is complete
+    duration: 2
+    backgroundColor: {r: 0, g: 0, b: 0, a: 0}
+  - timestamp: 3.5
+    text: You explored your strengths, discovered real careers and learned more about
+      yourself
+    duration: 5
+    backgroundColor: {r: 0, g: 0, b: 0, a: 0}
+  - timestamp: 8.5
+    text: Great job!
+    duration: 1.5
+    backgroundColor: {r: 0, g: 0, b: 0, a: 0}
   floatAmplitude: 0.2
   floatSpeed: 1
   followOffset: {x: -14, y: 11.5, z: 9.23}
@@ -5377,7 +5452,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 977504497}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 432751206}
+        m_TargetAssemblyTypeName: ExpoBotInteraction, Assembly-CSharp
+        m_MethodName: OnClickCloseSurvey
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &977504497
 MonoBehaviour:
   m_ObjectHideFlags: 0

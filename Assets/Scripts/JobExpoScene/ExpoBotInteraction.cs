@@ -1249,6 +1249,87 @@ public class ExpoBotInteraction : MonoBehaviour
         skipHoldTimer = 0f;
     }
 
+    // Called by the "X" (close) button on the survey panel
+    // Called by the "X" (close) button on the survey panel
+    public void OnClickCloseSurvey()
+    {
+        // If the panel isn't open, nothing to do
+        if (surveyPanel == null || !surveyPanel.activeSelf)
+            return;
+
+        // Run the close + fade coroutine
+        StartCoroutine(CloseSurveyWithFade());
+    }
+
+    private IEnumerator CloseSurveyWithFade()
+    {
+        // Make sure we have a CanvasGroup to fade
+        var canvasGroup = surveyPanel.GetComponent<CanvasGroup>();
+        if (canvasGroup == null)
+            canvasGroup = surveyPanel.AddComponent<CanvasGroup>();
+
+        // Fade / scale out
+        yield return StartCoroutine(AnimatePanelOut(canvasGroup, surveyPanel.transform));
+
+        // Now actually hide the panel
+        surveyPanel.SetActive(false);
+
+        // Reset survey flow state so next time it starts from the beginning
+        currentQuestionIndex = 0;
+        totalScore = 0;
+        isTransitioning = false;
+
+        // Clear button listeners and restore basic state
+        if (optionButtons != null)
+        {
+            foreach (var btn in optionButtons)
+            {
+                if (btn == null) continue;
+
+                btn.onClick.RemoveAllListeners();
+                btn.interactable = true;
+
+                // Reset colors in case one was highlighted
+                var colors = btn.colors;
+                colors.normalColor = Color.white;
+                btn.colors = colors;
+            }
+        }
+
+        // Mark that we are no longer interacting with the bot
+        isInteracting = false;
+
+        // Give control back to the player (same behavior as when survey ends normally)
+        OnSurveyFinished();
+    }
+
+    private IEnumerator AnimatePanelOut(CanvasGroup canvasGroup, Transform panelTransform)
+    {
+        float elapsed = 0f;
+        float startAlpha = canvasGroup.alpha;
+        Vector3 startScale = panelTransform.localScale;
+        Vector3 endScale = Vector3.one * 0.7f; // shrink slightly as it fades
+
+        while (elapsed < panelAnimDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / panelAnimDuration;
+            float smoothT = Mathf.SmoothStep(0f, 1f, t);
+
+            canvasGroup.alpha = Mathf.Lerp(startAlpha, 0f, smoothT);
+            panelTransform.localScale = Vector3.Lerp(startScale, endScale, smoothT);
+
+            yield return null;
+        }
+
+        canvasGroup.alpha = 0f;
+        panelTransform.localScale = endScale;
+    }
+
+
+
+
+
     private IEnumerator FadeCanvasGroup(CanvasGroup cg, float from, float to, float duration)
     {
         if (cg == null) yield break;
