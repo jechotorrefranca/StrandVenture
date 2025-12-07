@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.InputSystem;
@@ -45,15 +44,39 @@ public class TimedBotSequence : MonoBehaviour
     public bool followPlayerRotation = true;
     public float lookAtSpeed = 6f;
     public bool allowFollowDuringMove = true;
-    [Tooltip("Offset applied to the follow rotation in degrees (X = pitch, Y = yaw, Z = roll). ")]
+    [Tooltip("Offset applied to the follow rotation in degrees (X = pitch, Y = yaw, Z = roll).")]
     public Vector3 followRotationOffsetEuler = Vector3.zero;
 
-    [Header("Timed Actions")]
+    [Header("Actions (play in this order)")]
     public TimedBotAction[] actions;
 
     [Header("Integration")]
     [Tooltip("If assigned the TimedBotSequence will call ActivateInteractables() at the end of the sequence instead of loading a scene")]
     public InteractionManager interactionManager;
+
+    // -------------------------
+    // Subtitle UI
+    // -------------------------
+    [Header("Subtitle UI")]
+    public GameObject subtitlePanel;    // panel containing subtitle UI
+    public Image subtitleBackground;    // background image
+    public TMP_Text subtitleText;       // subtitle text
+
+    // -------------------------
+    // Skip UI (per-action speech)
+    // -------------------------
+    [Header("Skip UI")]
+    public GameObject skipUIPanel;      // small "Hold Space to Skip" panel
+    public Image skipFillImage;         // radial fill image
+    public float skipHoldDuration = 1.5f;
+    [Tooltip("Delay before skip UI appears for a talking action")]
+    public float skipVisibleDelay = 1.5f;
+
+    // skip internals
+    private CanvasGroup skipCanvasGroup;
+    private float skipHoldTimer = 0f;
+    private bool skipActive = false;        // true when skip UI visible & usable
+    private Coroutine skipShowCoroutine;
 
     // internals
     private AudioSource internalAudio;
@@ -70,6 +93,10 @@ public class TimedBotSequence : MonoBehaviour
 
     private Coroutine currentMoveCoroutine;
     private Coroutine currentActionCoroutine;
+    private Coroutine subtitleCoroutine;
+
+    // skip only the CURRENT action, not the whole sequence
+    private bool skipCurrentActionRequested = false;
 
     void Reset()
     {
@@ -85,6 +112,9 @@ public class TimedBotSequence : MonoBehaviour
         if (botAudioSource == null)
             botAudioSource = internalAudio;
 
+        // Make sure dialogue audio does NOT loop
+        botAudioSource.loop = false;
+
         if (botModel != null)
         {
             if (botAnimation == null)
@@ -96,6 +126,11 @@ public class TimedBotSequence : MonoBehaviour
             if (botAnimation != null)
                 botAnimation.cullingType = AnimationCullingType.AlwaysAnimate;
 
+            // Initial base transform
+            botBasePosition = botModel.transform.position;
+            botBaseRotation = botModel.transform.rotation;
+
+            // If first action has a position, optionally snap there
             if (actions != null && actions.Length > 0 && actions[0] != null && actions[0].botPosition != null)
             {
                 botBasePosition = actions[0].botPosition.position;
@@ -103,23 +138,41 @@ public class TimedBotSequence : MonoBehaviour
                 botModel.transform.position = botBasePosition;
                 botModel.transform.rotation = botBaseRotation;
             }
-            else
-            {
-                botBasePosition = botModel.transform.position;
-                botBaseRotation = botModel.transform.rotation;
-            }
         }
-
-        if (actions != null && actions.Length > 1)
-            actions = actions.OrderBy(a => a.timestamp).ToArray();
 
         PrepareBuiltinClips();
         PrepareAnimationClips();
+
+        // Subtitle UI initial state
+        if (subtitlePanel != null)
+            subtitlePanel.SetActive(false);
+        if (subtitleBackground != null)
+        {
+            subtitleBackground.enabled = false;
+            subtitleBackground.gameObject.SetActive(false);
+        }
+        if (subtitleText != null)
+            subtitleText.text = "";
+
+        // Skip UI setup
+        if (skipUIPanel != null)
+        {
+            skipCanvasGroup = skipUIPanel.GetComponent<CanvasGroup>();
+            if (skipCanvasGroup == null)
+                skipCanvasGroup = skipUIPanel.AddComponent<CanvasGroup>();
+
+            skipCanvasGroup.alpha = 0f;
+            skipUIPanel.SetActive(true);   // keep active; alpha controls visibility
+        }
+        skipActive = false;
+        skipHoldTimer = 0f;
+        if (skipFillImage != null) skipFillImage.fillAmount = 0f;
     }
 
     IEnumerator Start()
     {
         fadeAlpha = 1f;
+        skipCurrentActionRequested = false;
 
         if (botModel != null)
         {
@@ -136,44 +189,41 @@ public class TimedBotSequence : MonoBehaviour
 
         yield return null;
 
+        // fade from black to clear
         yield return StartCoroutine(FadeOverlay(false));
 
         yield return new WaitForSeconds(startDelay);
 
+        // start floating idle motion
         StartCoroutine(FloatBot());
 
-        float sequenceStart = Time.time;
-
-        if (actions == null || actions.Length == 0)
+        // Play actions in inspector order
+        if (actions != null && actions.Length > 0)
         {
-            yield return new WaitForSeconds(0.5f);
+            for (int idx = 0; idx < actions.Length; idx++)
+            {
+                TimedBotAction action = actions[idx];
+                if (action == null) continue;
+
+                // reset per-action skip flag
+                skipCurrentActionRequested = false;
+
+                currentActionCoroutine = StartCoroutine(PlayAction(action));
+                yield return currentActionCoroutine;
+                currentActionCoroutine = null;
+                // Immediately continues to next action (or end) after PlayAction returns
+            }
         }
         else
         {
-            int idx = 0;
-            float sequenceExpectedEnd = 0f;
-
-            while (idx < actions.Length)
-            {
-                TimedBotAction action = actions[idx];
-                float waitFor = sequenceStart + action.timestamp - Time.time;
-                if (waitFor > 0f) yield return new WaitForSeconds(waitFor);
-
-                StartCoroutine(PlayAction(action));
-
-                float clipLen = Mathf.Max(
-                    action.audioClip != null ? action.audioClip.length : 0f,
-                    action.animationClip != null ? action.animationClip.length : 0f
-                );
-                sequenceExpectedEnd = Mathf.Max(sequenceExpectedEnd, action.timestamp + clipLen);
-
-                idx++;
-            }
-
-            float remaining = (sequenceStart + sequenceExpectedEnd + endPadding) - Time.time;
-            if (remaining > 0f) yield return new WaitForSeconds(remaining);
+            yield return new WaitForSeconds(0.5f);
         }
 
+        // optional padding at the very end
+        if (endPadding > 0f)
+            yield return new WaitForSeconds(endPadding);
+
+        // at end of sequence
         if (interactionManager != null)
         {
             interactionManager.ActivateInteractables();
@@ -184,6 +234,33 @@ public class TimedBotSequence : MonoBehaviour
         {
             yield return StartCoroutine(FadeOverlay(true));
             SceneManager.LoadScene(sceneToLoadAfter);
+        }
+    }
+
+    void Update()
+    {
+        // Handle skip input only when skip is active
+        if (!skipActive) return;
+        var kb = Keyboard.current;
+        if (kb == null) return;
+
+        if (kb.spaceKey.isPressed)
+        {
+            skipHoldTimer += Time.deltaTime;
+            if (skipFillImage != null)
+                skipFillImage.fillAmount = Mathf.Clamp01(skipHoldTimer / skipHoldDuration);
+
+            if (skipHoldTimer >= skipHoldDuration)
+            {
+                SkipNow();
+                skipHoldTimer = 0f;
+                if (skipFillImage != null) skipFillImage.fillAmount = 0f;
+            }
+        }
+        else if (kb.spaceKey.wasReleasedThisFrame)
+        {
+            skipHoldTimer = 0f;
+            if (skipFillImage != null) skipFillImage.fillAmount = 0f;
         }
     }
 
@@ -216,11 +293,13 @@ public class TimedBotSequence : MonoBehaviour
             audioMonitorCoroutine = null;
         }
 
-        // Stop audio
+        // Stop audio & subtitles & skip
         if (botAudioSource != null && botAudioSource.isPlaying)
         {
             botAudioSource.Stop();
         }
+        StopSubtitleSequence();
+        HideSkipUIImmediate();
 
         // Reset to idle
         if (botAnimation != null && idleAnimation != null)
@@ -229,12 +308,15 @@ public class TimedBotSequence : MonoBehaviour
         }
         SetMouthState(false);
 
+        // reset per-action skip
+        skipCurrentActionRequested = false;
+
         // Play new action
         currentActionCoroutine = StartCoroutine(PlayAction(action));
         yield return currentActionCoroutine;
         currentActionCoroutine = null;
 
-        // Wait for audio to finish
+        // Wait for audio to finish (MonitorAudio sets audioMonitorCoroutine to null when done)
         while (audioMonitorCoroutine != null)
             yield return null;
     }
@@ -256,13 +338,16 @@ public class TimedBotSequence : MonoBehaviour
         float animLen = action.animationClip != null ? action.animationClip.length : 0f;
         float moveDur = action.moveDuration > 0f ? action.moveDuration : (animLen > 0f ? animLen : defaultMoveDuration);
 
-        if (action.audioClip != null && !action.startAudioAfterAnimation && botAudioSource != null)
+        bool hasAudio = (action.audioClip != null && botAudioSource != null);
+        float audioMaxDuration = hasAudio ? action.audioClip.length + 0.25f : 0f; // safety margin
+
+        // AUDIO BEFORE ANIMATION (if flagged)
+        if (hasAudio && !action.startAudioAfterAnimation)
         {
-            botAudioSource.PlayOneShot(action.audioClip);
-            if (audioMonitorCoroutine != null) StopCoroutine(audioMonitorCoroutine);
-            audioMonitorCoroutine = StartCoroutine(MonitorAudioAndSwitchAnimation());
+            StartAudioForAction(action);
         }
 
+        // ANIMATION
         if (action.animationClip != null && botAnimation != null)
         {
             string key = action.GetClipKey();
@@ -272,6 +357,7 @@ public class TimedBotSequence : MonoBehaviour
             botAnimation.CrossFade(key, 0.05f);
         }
 
+        // MOVEMENT
         currentMoveCoroutine = null;
         if (action.botPosition != null && botModel != null)
         {
@@ -279,8 +365,8 @@ public class TimedBotSequence : MonoBehaviour
             if (respectRotation)
             {
                 currentMoveCoroutine = StartCoroutine(MoveAndRotate(botModel.transform.position, action.botPosition.position,
-                                                                  botModel.transform.rotation, action.botPosition.rotation,
-                                                                  moveDur));
+                                                                   botModel.transform.rotation, action.botPosition.rotation,
+                                                                   moveDur));
             }
             else
             {
@@ -288,24 +374,117 @@ public class TimedBotSequence : MonoBehaviour
             }
         }
 
-        if (action.animationClip != null)
+        // WAIT FOR ANIMATION OR MOVE (with skip support)
+        if (action.animationClip != null && animLen > 0f)
         {
-            yield return new WaitForSeconds(animLen);
+            float waited = 0f;
+            while (waited < animLen && !skipCurrentActionRequested)
+            {
+                waited += Time.deltaTime;
+                yield return null;
+            }
         }
         else if (currentMoveCoroutine != null)
         {
-            yield return currentMoveCoroutine;
+            // wait until movement coroutine sets itself to null OR skip is requested
+            while (currentMoveCoroutine != null && !skipCurrentActionRequested)
+            {
+                yield return null;
+            }
         }
         else
         {
             yield return null;
         }
 
-        if (action.audioClip != null && action.startAudioAfterAnimation && botAudioSource != null)
+        // AUDIO AFTER ANIMATION (if flagged)
+        if (hasAudio && action.startAudioAfterAnimation && !skipCurrentActionRequested)
         {
-            botAudioSource.PlayOneShot(action.audioClip);
-            if (audioMonitorCoroutine != null) StopCoroutine(audioMonitorCoroutine);
-            audioMonitorCoroutine = StartCoroutine(MonitorAudioAndSwitchAnimation());
+            StartAudioForAction(action);
+        }
+
+        // WAIT FOR AUDIO (either it started before or after animation)
+        if (hasAudio && !skipCurrentActionRequested)
+        {
+            float audioWaited = 0f;
+            while (botAudioSource != null &&
+                   botAudioSource.isPlaying &&
+                   !skipCurrentActionRequested &&
+                   audioWaited < audioMaxDuration)
+            {
+                audioWaited += Time.deltaTime;
+                yield return null;
+            }
+        }
+
+        // when action completes (naturally or via skip), reset animation to idle (if no other audio)
+        if ((botAudioSource == null || !botAudioSource.isPlaying) && botAnimation != null && idleAnimation != null)
+        {
+            botAnimation.CrossFade("Idle", 0.08f);
+            SetMouthState(false);
+        }
+
+        // hide subtitles & skip UI at end of this action
+        StopSubtitleSequence();
+        HideSkipUIImmediate();
+
+        // reset per-action skip flag for next action
+        skipCurrentActionRequested = false;
+    }
+
+    // Centralized audio + subtitles + skip for a TimedBotAction
+    private void StartAudioForAction(TimedBotAction action)
+    {
+        if (action == null || action.audioClip == null || botAudioSource == null)
+            return;
+
+        // stop previous audio / monitor / subtitles / skip
+        if (audioMonitorCoroutine != null)
+        {
+            StopCoroutine(audioMonitorCoroutine);
+            audioMonitorCoroutine = null;
+        }
+
+        if (botAudioSource.isPlaying)
+        {
+            botAudioSource.Stop();
+        }
+
+        StopSubtitleSequence();
+        HideSkipUIImmediate();
+
+        // reset per-action skip
+        skipCurrentActionRequested = false;
+
+        // play new audio
+        botAudioSource.clip = action.audioClip;
+        botAudioSource.loop = false;
+        botAudioSource.Play();
+
+        // talk detection & mouth
+        audioMonitorCoroutine = StartCoroutine(MonitorAudioAndSwitchAnimation());
+
+        // subtitles
+        if (action.subtitleSegments != null && action.subtitleSegments.Length > 0)
+        {
+            subtitleCoroutine = StartCoroutine(SubtitleSequenceCoroutine(action.audioClip, action.subtitleSegments));
+        }
+
+        // skip UI
+        if (action.allowSkip && skipCanvasGroup != null)
+        {
+            skipCanvasGroup.alpha = 0f;
+            skipActive = false;
+            skipHoldTimer = 0f;
+            if (skipFillImage != null) skipFillImage.fillAmount = 0f;
+
+            if (skipShowCoroutine != null)
+            {
+                StopCoroutine(skipShowCoroutine);
+                skipShowCoroutine = null;
+            }
+
+            skipShowCoroutine = StartCoroutine(ShowSkipAfterDelay(skipVisibleDelay));
         }
     }
 
@@ -326,6 +505,9 @@ public class TimedBotSequence : MonoBehaviour
 
         botModel.transform.position = toPos;
         botBasePosition = toPos;
+
+        // IMPORTANT: mark movement finished so PlayAction can continue
+        currentMoveCoroutine = null;
     }
 
     IEnumerator MoveAndRotate(Vector3 fromPos, Vector3 toPos, Quaternion fromRot, Quaternion toRot, float duration)
@@ -334,6 +516,7 @@ public class TimedBotSequence : MonoBehaviour
         {
             botBasePosition = toPos;
             botBaseRotation = toRot;
+            currentMoveCoroutine = null;
             yield break;
         }
 
@@ -359,6 +542,9 @@ public class TimedBotSequence : MonoBehaviour
         botModel.transform.rotation = toRot;
         botBasePosition = toPos;
         botBaseRotation = toRot;
+
+        // IMPORTANT: mark movement finished
+        currentMoveCoroutine = null;
     }
 
     IEnumerator FloatBot()
@@ -505,23 +691,245 @@ public class TimedBotSequence : MonoBehaviour
         if (mouthOpenMesh != null) mouthOpenMesh.SetActive(talking);
         if (mouthClosedMesh != null) mouthClosedMesh.SetActive(!talking);
     }
+
+    // -------------------------
+    // Subtitles
+    // -------------------------
+    private IEnumerator SubtitleSequenceCoroutine(AudioClip clip, SubtitleSegment[] segments)
+    {
+        if (clip == null || segments == null || segments.Length == 0) yield break;
+        if (botAudioSource == null) yield break;
+
+        SubtitleSegment[] sorted = (SubtitleSegment[])segments.Clone();
+        System.Array.Sort(sorted, (a, b) => a.timestamp.CompareTo(b.timestamp));
+
+        int idx = 0;
+        float clipLength = clip.length;
+
+        while (idx < sorted.Length && botAudioSource != null && botAudioSource.isPlaying)
+        {
+            float currentTime = botAudioSource.time;
+            SubtitleSegment seg = sorted[idx];
+
+            if (currentTime + 0.0001f >= seg.timestamp)
+            {
+                float segDuration = seg.duration;
+                if (segDuration <= 0f)
+                {
+                    if (idx + 1 < sorted.Length)
+                        segDuration = Mathf.Max(0.02f, sorted[idx + 1].timestamp - seg.timestamp);
+                    else
+                        segDuration = Mathf.Max(0.02f, clipLength - seg.timestamp);
+                }
+
+                // show subtitle + background
+                if (subtitlePanel != null) subtitlePanel.SetActive(true);
+                if (subtitleText != null) subtitleText.text = seg.text ?? "";
+
+                if (subtitleBackground != null)
+                {
+                    subtitleBackground.enabled = true;
+                    subtitleBackground.gameObject.SetActive(true);
+                    Color c = seg.backgroundColor;
+                    if (c.a <= 0.01f) c.a = 0.85f;
+                    subtitleBackground.color = c;
+                }
+
+                float waited = 0f;
+                while (waited < segDuration && botAudioSource != null && botAudioSource.isPlaying)
+                {
+                    waited += Time.deltaTime;
+                    yield return null;
+                }
+
+                // hide between segments
+                if (subtitlePanel != null) subtitlePanel.SetActive(false);
+                if (subtitleBackground != null)
+                {
+                    subtitleBackground.enabled = false;
+                    subtitleBackground.gameObject.SetActive(false);
+                }
+
+                idx++;
+            }
+            else
+            {
+                yield return null;
+            }
+        }
+
+        StopSubtitleSequence();
+    }
+
+    private void StopSubtitleSequence()
+    {
+        if (subtitleCoroutine != null)
+        {
+            StopCoroutine(subtitleCoroutine);
+            subtitleCoroutine = null;
+        }
+
+        if (subtitlePanel != null) subtitlePanel.SetActive(false);
+        if (subtitleBackground != null)
+        {
+            subtitleBackground.enabled = false;
+            subtitleBackground.gameObject.SetActive(false);
+        }
+        if (subtitleText != null)
+            subtitleText.text = "";
+    }
+
+    // -------------------------
+    // Skip UI helpers
+    // -------------------------
+    private IEnumerator ShowSkipAfterDelay(float delay)
+    {
+        if (skipCanvasGroup == null) yield break;
+
+        yield return new WaitForSeconds(delay);
+
+        // fade in skip UI
+        yield return StartCoroutine(FadeCanvasGroup(skipCanvasGroup, skipCanvasGroup.alpha, 1f, 0.4f));
+        skipActive = true;
+        skipHoldTimer = 0f;
+        if (skipFillImage != null) skipFillImage.fillAmount = 0f;
+        skipShowCoroutine = null;
+    }
+
+    private void HideSkipUIImmediate()
+    {
+        if (skipShowCoroutine != null)
+        {
+            StopCoroutine(skipShowCoroutine);
+            skipShowCoroutine = null;
+        }
+
+        if (skipCanvasGroup != null)
+        {
+            skipCanvasGroup.alpha = 0f;
+        }
+
+        skipActive = false;
+        skipHoldTimer = 0f;
+        if (skipFillImage != null) skipFillImage.fillAmount = 0f;
+    }
+
+    private void SkipNow()
+    {
+        if (!skipActive) return;
+
+        // mark skip requested for THIS action
+        skipActive = false;
+        skipCurrentActionRequested = true;
+
+        // stop audio immediately
+        if (botAudioSource != null && botAudioSource.isPlaying)
+            botAudioSource.Stop();
+
+        // stop talk monitor
+        if (audioMonitorCoroutine != null)
+        {
+            StopCoroutine(audioMonitorCoroutine);
+            audioMonitorCoroutine = null;
+        }
+
+        // stop movement if it's running
+        if (currentMoveCoroutine != null)
+        {
+            StopCoroutine(currentMoveCoroutine);
+            currentMoveCoroutine = null;
+        }
+
+        // reset animation to idle
+        if (botAnimation != null && idleAnimation != null)
+            botAnimation.CrossFade("Idle", 0.08f);
+        SetMouthState(false);
+
+        // stop subtitles
+        StopSubtitleSequence();
+
+        // hide skip UI
+        if (skipCanvasGroup != null)
+            StartCoroutine(FadeCanvasGroup(skipCanvasGroup, skipCanvasGroup.alpha, 0f, 0.2f));
+
+        if (skipFillImage != null) skipFillImage.fillAmount = 0f;
+        skipHoldTimer = 0f;
+    }
+
+    private IEnumerator FadeCanvasGroup(CanvasGroup cg, float from, float to, float duration)
+    {
+        if (cg == null) yield break;
+        float elapsed = 0f;
+        cg.alpha = from;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            cg.alpha = Mathf.Lerp(from, to, elapsed / duration);
+            yield return null;
+        }
+        cg.alpha = to;
+    }
+
+    void OnDestroy()
+    {
+        if (audioMonitorCoroutine != null) StopCoroutine(audioMonitorCoroutine);
+        if (currentMoveCoroutine != null) StopCoroutine(currentMoveCoroutine);
+        if (currentActionCoroutine != null) StopCoroutine(currentActionCoroutine);
+        if (subtitleCoroutine != null) StopCoroutine(subtitleCoroutine);
+        if (skipShowCoroutine != null) StopCoroutine(skipShowCoroutine);
+    }
+}
+
+// -------------------------
+// Shared subtitle data type
+// -------------------------
+[System.Serializable]
+public class SubtitleSegment
+{
+    [Tooltip("Seconds from clip start when this subtitle appears")]
+    public float timestamp;
+
+    [TextArea(1, 4)]
+    public string text;
+
+    [Tooltip("Duration in seconds (0 = auto until next segment or clip end)")]
+    public float duration;
+
+    [Tooltip("Background color for this subtitle segment (RGBA)")]
+    public Color backgroundColor = new Color(0f, 0f, 0f, 0.85f);
 }
 
 [System.Serializable]
 public class TimedBotAction
 {
-    [Tooltip("Seconds from sequence start when this action begins")]
-    public float timestamp;
+    [Header("Optional animation for this step")]
     public AnimationClip animationClip;
+
+    [Header("Audio for this step")]
     public AudioClip audioClip;
+
+    [Header("Target position for this step (optional)")]
     public Transform botPosition;
     public float moveDuration = 0f;
+
+    [Header("Flow")]
+    [Tooltip("If true: play animation first, then start audio. If false: start audio first, then animation.")]
     public bool startAudioAfterAnimation = true;
+
     public bool lockRotationDuringMove = false;
+
+    [Header("Dialogue / Subtitles")]
+    [Tooltip("Optional subtitle segments for this action's audio clip")]
+    public SubtitleSegment[] subtitleSegments;
+
+    [Tooltip("Allow skipping this audio by holding Space (radial pie)")]
+    public bool allowSkip = true;
 
     public string GetClipKey()
     {
-        string namePart = animationClip != null ? animationClip.name : "noanim";
-        return $"__TIMED_{timestamp:F2}_{namePart}";
+        // Use the clip name as key; assume you don't reuse the same clip name for different actions
+        if (animationClip != null)
+            return "__ACTION_" + animationClip.name;
+        return "__ACTION_noanim";
     }
 }

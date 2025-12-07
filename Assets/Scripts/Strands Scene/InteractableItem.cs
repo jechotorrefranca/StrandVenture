@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Video;
 
 public class InteractableItem : MonoBehaviour
 {
@@ -16,6 +17,16 @@ public class InteractableItem : MonoBehaviour
     [Header("Panel (per-item)")]
     [Tooltip("Prefab for the per-item interaction panel. Can be any UI prefab with a close button.")]
     public GameObject interactionPanelPrefab;
+
+    [Header("Simple text panel")]
+    [TextArea] public string itemInfo = "Info about this item...";
+
+    [Header("Slideshow data")]
+    public Sprite[] slideshowImages;
+    public string[] slideshowCaptions;
+
+    [Header("Video data")]
+    public VideoClip videoClip;
 
     [Header("Glow Settings")]
     [Tooltip("Renderers to apply glow effect to. Leave empty to auto-find all renderers in children.")]
@@ -38,8 +49,8 @@ public class InteractableItem : MonoBehaviour
     [Tooltip("Update interval in seconds. Higher = less lag, lower = smoother animation")]
     public float updateInterval = 0.05f; // 20Hz default
 
-    [HideInInspector] public bool inspected = false; // Changed from 'completed' - marks if E was pressed
-    [HideInInspector] public bool spaceDone = false; // Marks if Space animation/audio finished
+    [HideInInspector] public bool inspected = false; // marks if E was pressed
+    [HideInInspector] public bool spaceDone = false; // Marks if Q/bot interaction finished
 
     // Store all materials from all renderers
     private List<Material> allMaterials = new List<Material>();
@@ -76,7 +87,6 @@ public class InteractableItem : MonoBehaviour
         {
             if (renderer == null) continue;
 
-            // Get ALL materials from this renderer (creates instances)
             Material[] materials = renderer.materials;
 
             foreach (Material mat in materials)
@@ -85,13 +95,11 @@ public class InteractableItem : MonoBehaviour
 
                 allMaterials.Add(mat);
 
-                // Capture original color
                 if (mat.HasProperty("_Color"))
                 {
                     Color originalCol = mat.color;
                     allOriginalColors.Add(originalCol);
 
-                    // Use first material's color as the original color if not set
                     if (!originalColorCaptured)
                     {
                         originalColor = originalCol;
@@ -104,7 +112,6 @@ public class InteractableItem : MonoBehaviour
                 }
             }
 
-            // Assign the instances back to ensure we're using instance materials
             renderer.materials = materials;
         }
 
