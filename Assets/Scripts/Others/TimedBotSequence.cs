@@ -1,4 +1,6 @@
+using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.InputSystem;
@@ -464,11 +466,27 @@ public class TimedBotSequence : MonoBehaviour
         // talk detection & mouth
         audioMonitorCoroutine = StartCoroutine(MonitorAudioAndSwitchAnimation());
 
-        // subtitles
-        if (action.subtitleSegments != null && action.subtitleSegments.Length > 0)
+        // ---- SUBTITLES (AUTO ONLY) ----
+        SubtitleSegment[] segments = null;
+
+        // Use runtime cache if we already generated them once
+        if (action.runtimeSubtitles != null && action.runtimeSubtitles.Length > 0)
         {
-            subtitleCoroutine = StartCoroutine(SubtitleSequenceCoroutine(action.audioClip, action.subtitleSegments));
+            segments = action.runtimeSubtitles;
         }
+        else if (!string.IsNullOrWhiteSpace(action.autoSubtitleText))
+        {
+            segments = GenerateAutoSubtitles(action);
+            action.runtimeSubtitles = segments;
+        }
+
+        if (segments != null && segments.Length > 0)
+        {
+            subtitleCoroutine = StartCoroutine(SubtitleSequenceCoroutine(action.audioClip, segments));
+        }
+        // --------------------------------
+
+
 
         // skip UI
         if (action.allowSkip && skipCanvasGroup != null)
@@ -693,7 +711,91 @@ public class TimedBotSequence : MonoBehaviour
     }
 
     // -------------------------
-    // Subtitles
+    // Subtitle helpers (AUTO GENERATION)
+    // -------------------------
+    private SubtitleSegment[] GenerateAutoSubtitles(TimedBotAction action)
+    {
+        if (action == null || action.audioClip == null)
+            return null;
+
+        string raw = action.autoSubtitleText;
+        if (string.IsNullOrWhiteSpace(raw))
+            return null;
+
+        List<string> chunks = (action.subtitleChunkMode == SubtitleChunkMode.ByWords)
+            ? BuildChunksByWords(raw, action.wordsPerSubtitle)
+            : BuildChunksByLines(raw);
+
+        if (chunks.Count == 0)
+            return null;
+
+        float clipLength = action.audioClip.length;
+        if (clipLength <= 0f)
+        {
+            // fallback: 1 second per chunk if length invalid
+            clipLength = chunks.Count;
+        }
+
+        float slice = clipLength / chunks.Count;
+
+        SubtitleSegment[] segments = new SubtitleSegment[chunks.Count];
+        for (int i = 0; i < chunks.Count; i++)
+        {
+            segments[i] = new SubtitleSegment
+            {
+                timestamp = i * slice,
+                duration = slice,
+                text = chunks[i]
+                // backgroundColor uses default value
+            };
+        }
+
+        return segments;
+    }
+
+    private List<string> BuildChunksByLines(string rawText)
+    {
+        string[] rawLines = rawText.Split('\n');
+        List<string> lines = new List<string>();
+
+        foreach (var raw in rawLines)
+        {
+            string line = raw.Trim();
+            if (!string.IsNullOrEmpty(line))
+                lines.Add(line);
+        }
+
+        return lines;
+    }
+
+    private List<string> BuildChunksByWords(string rawText, int wordsPerChunk)
+    {
+        if (wordsPerChunk <= 0) wordsPerChunk = 6;
+
+        char[] sep = { ' ', '\t', '\n', '\r' };
+        string[] words = rawText.Split(sep, StringSplitOptions.RemoveEmptyEntries);
+
+        List<string> chunks = new List<string>();
+        List<string> current = new List<string>();
+
+        for (int i = 0; i < words.Length; i++)
+        {
+            current.Add(words[i]);
+            if (current.Count >= wordsPerChunk)
+            {
+                chunks.Add(string.Join(" ", current));
+                current.Clear();
+            }
+        }
+
+        if (current.Count > 0)
+            chunks.Add(string.Join(" ", current));
+
+        return chunks;
+    }
+
+    // -------------------------
+    // Subtitles (display)
     // -------------------------
     private IEnumerator SubtitleSequenceCoroutine(AudioClip clip, SubtitleSegment[] segments)
     {
@@ -899,6 +1001,12 @@ public class SubtitleSegment
     public Color backgroundColor = new Color(0f, 0f, 0f, 0.85f);
 }
 
+public enum SubtitleChunkMode
+{
+    ByLines,   // each line = one subtitle
+    ByWords    // chunk by wordsPerSubtitle
+}
+
 [System.Serializable]
 public class TimedBotAction
 {
@@ -918,16 +1026,26 @@ public class TimedBotAction
 
     public bool lockRotationDuringMove = false;
 
-    [Header("Dialogue / Subtitles")]
-    [Tooltip("Optional subtitle segments for this action's audio clip")]
-    public SubtitleSegment[] subtitleSegments;
+    [Header("Dialogue / Subtitles (auto)")]
+    [Tooltip("Text used to automatically generate subtitles for this action's audio clip.")]
+    [TextArea(2, 4)]
+    public string autoSubtitleText;
+
+    [Tooltip("How to split autoSubtitleText into chunks.")]
+    public SubtitleChunkMode subtitleChunkMode = SubtitleChunkMode.ByLines;
+
+    [Tooltip("Words per subtitle when using 'ByWords' mode.")]
+    public int wordsPerSubtitle = 6;
+
+    // 🔹 Runtime-only cache. NOT serialized, so your old arrays are effectively gone.
+    [System.NonSerialized]
+    public SubtitleSegment[] runtimeSubtitles;
 
     [Tooltip("Allow skipping this audio by holding Space (radial pie)")]
     public bool allowSkip = true;
 
     public string GetClipKey()
     {
-        // Use the clip name as key; assume you don't reuse the same clip name for different actions
         if (animationClip != null)
             return "__ACTION_" + animationClip.name;
         return "__ACTION_noanim";

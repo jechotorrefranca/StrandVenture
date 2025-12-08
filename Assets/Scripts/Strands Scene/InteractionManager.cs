@@ -45,8 +45,17 @@ public class InteractionManager : MonoBehaviour
     public Transform finalBotPosition;
     public string nextSceneName;
 
-    [Tooltip("Subtitles for the FINAL bot dialogue (handled by TimedBotSequence).")]
-    public SubtitleSegment[] finalSubtitleSegments;
+    [Header("Final Dialogue Subtitles (auto)")]
+    [TextArea(3, 10)]
+    [Tooltip("Text used to auto-generate subtitles for the FINAL bot dialogue.")]
+    public string finalAutoSubtitleText;
+
+    [Tooltip("How to chunk the final auto subtitle text.")]
+    public SubtitleChunkMode finalSubtitleChunkMode = SubtitleChunkMode.ByLines;
+
+    [Tooltip("Words per subtitle when using 'ByWords' for final dialogue.")]
+    public int finalWordsPerSubtitle = 6;
+
     [Tooltip("Allow skipping the FINAL bot dialogue via space + radial pie.")]
     public bool finalAllowSkip = true;
 
@@ -199,7 +208,6 @@ public class InteractionManager : MonoBehaviour
 
         // -----------------------------
         // 2) Normal interactables
-        //    (works both before and after finalActionPlayed; only blocked while looking at bot)
         // -----------------------------
         if (Physics.Raycast(r, out RaycastHit hit, gazeMaxDistance, interactableLayer))
         {
@@ -356,6 +364,22 @@ public class InteractionManager : MonoBehaviour
             if (debugPrompts) Debug.Log($"[Space] Replaying interaction for {item.name}, keeping spaceDone=true");
         }
 
+        // -----------------------------
+        // Build TimedBotAction with AUTO subtitles from InteractableItem
+        // -----------------------------
+        string autoText = null;
+        SubtitleChunkMode mode = SubtitleChunkMode.ByLines;
+        int wordsPer = 6;
+
+        if (item.autoGenerateSubtitles && !string.IsNullOrEmpty(item.autoSubtitleText))
+        {
+            autoText = item.autoSubtitleText;
+            mode = (item.autoSubtitleMode == InteractableItem.AutoSubtitleMode.ByWords)
+                ? SubtitleChunkMode.ByWords
+                : SubtitleChunkMode.ByLines;
+            wordsPer = Mathf.Max(1, item.wordsPerSubtitle);
+        }
+
         TimedBotAction action = new TimedBotAction
         {
             animationClip = item.interactionAnimation,
@@ -364,7 +388,13 @@ public class InteractionManager : MonoBehaviour
             moveDuration = item.interactionAnimation != null ? item.interactionAnimation.length : 0f,
             startAudioAfterAnimation = true,
             lockRotationDuringMove = true,
+
+            autoSubtitleText = autoText,
+            subtitleChunkMode = mode,
+            wordsPerSubtitle = wordsPer,
+            allowSkip = true
         };
+        // -----------------------------
 
         if (botSequence != null)
         {
@@ -489,7 +519,6 @@ public class InteractionManager : MonoBehaviour
                     Debug.LogWarning("No close button found in UI prefab! Please add a Button or name it 'CloseButton'.");
                 }
 
-                // NEW: Let the panel script initialise itself
                 var uiController = currentInfoUI.GetComponent<IInteractableUI>();
                 if (uiController != null)
                 {
@@ -497,7 +526,6 @@ public class InteractionManager : MonoBehaviour
                 }
                 else
                 {
-                    // Fallback: simple text fill (uses itemInfo if set, else infoText)
                     var tmp = currentInfoUI.GetComponentInChildren<TMP_Text>();
                     if (tmp != null)
                     {
@@ -649,13 +677,16 @@ public class InteractionManager : MonoBehaviour
             moveDuration = finalBotAnimation != null ? finalBotAnimation.length : 0f,
             startAudioAfterAnimation = true,
             lockRotationDuringMove = true,
-            subtitleSegments = finalSubtitleSegments,
+
+            autoSubtitleText = finalAutoSubtitleText,
+            subtitleChunkMode = finalSubtitleChunkMode,
+            wordsPerSubtitle = Mathf.Max(1, finalWordsPerSubtitle),
             allowSkip = finalAllowSkip
         };
 
         if (botSequence != null)
         {
-            // Plays final dialogue with subtitles + skip (handled by TimedBotSequence)
+            // Plays final dialogue with auto subtitles + skip (handled by TimedBotSequence)
             yield return StartCoroutine(botSequence.TriggerImmediateActionAndWait(finalAction));
         }
         else

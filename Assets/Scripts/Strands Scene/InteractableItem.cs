@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -10,23 +11,56 @@ public class InteractableItem : MonoBehaviour
     public AnimationClip interactionAnimation;
     public AudioClip interactionAudio;
 
+    [Header("Subtitles (bot audio)")]
+    [Tooltip("If true, subtitles will be generated automatically from Auto Subtitle Text using the audio clip length.")]
+    public bool autoGenerateSubtitles = false;
+
+    public enum AutoSubtitleMode
+    {
+        ByLines,   // each line in autoSubtitleText = one subtitle
+        ByWords    // chunk by wordsPerSubtitle
+    }
+
+    [Tooltip("How to split the Auto Subtitle Text into subtitle chunks.")]
+    public AutoSubtitleMode autoSubtitleMode = AutoSubtitleMode.ByLines;
+
+    [Tooltip("Multiline text used to auto-generate subtitles.")]
+    [TextArea(3, 10)]
+    public string autoSubtitleText;
+
+    [Tooltip("Words per subtitle when using 'ByWords' mode.")]
+    public int wordsPerSubtitle = 6;
+
+    [Tooltip("If autoGenerateSubtitles is false, these subtitles will be used directly (optional).")]
+    public SubtitleSegment[] manualSubtitles;
+
+    // Cached/computed at runtime (either from auto or manual)
+    [HideInInspector] public SubtitleSegment[] computedSubtitles;
+
     [Header("Player view (for E interaction)")]
     public Transform playerViewTransform;
     [TextArea] public string infoText = "Info about this item...";
 
     [Header("Panel (per-item)")]
-    [Tooltip("Prefab for the per-item interaction panel. Can be any UI prefab with a close button.")]
+    [Tooltip("Prefab for the per-item interaction panel. Can be any UI prefab with a close button + IInteractableUI script.")]
     public GameObject interactionPanelPrefab;
 
-    [Header("Simple text panel")]
+    [Header("Simple text panel data")]
     [TextArea] public string itemInfo = "Info about this item...";
 
     [Header("Slideshow data")]
+    [Tooltip("Sprites used by SlideshowPanel / SlideshowPanelFit prefabs.")]
     public Sprite[] slideshowImages;
+    [Tooltip("Captions for each slide (same length as slideshowImages).")]
     public string[] slideshowCaptions;
 
     [Header("Video data")]
+    [Tooltip("Video clip used by VideoPanel prefab.")]
     public VideoClip videoClip;
+
+    [Header("3D Preview")]
+    [Tooltip("Prefab of the 3D model to preview inside Item3DPanel.")]
+    public GameObject previewModelPrefab;
 
     [Header("Glow Settings")]
     [Tooltip("Renderers to apply glow effect to. Leave empty to auto-find all renderers in children.")]
@@ -50,20 +84,126 @@ public class InteractableItem : MonoBehaviour
     public float updateInterval = 0.05f; // 20Hz default
 
     [HideInInspector] public bool inspected = false; // marks if E was pressed
-    [HideInInspector] public bool spaceDone = false; // Marks if Q/bot interaction finished
+    [HideInInspector] public bool spaceDone = false; // marks if Q/bot interaction finished
 
     // Store all materials from all renderers
-    private List<Material> allMaterials = new List<Material>();
-    private List<Color> allOriginalColors = new List<Color>();
+    private readonly List<Material> allMaterials = new List<Material>();
+    private readonly List<Color> allOriginalColors = new List<Color>();
     private Coroutine pulseCoroutine;
     private bool originalColorCaptured = false;
 
     [Header("Debug")]
     public bool debugLogs = false;
 
+    // Optional helpers if you ever want to branch on type from code
+    public bool HasSlideshow => slideshowImages != null && slideshowImages.Length > 0;
+    public bool HasVideo => videoClip != null;
+    public bool HasSimpleText => !string.IsNullOrEmpty(itemInfo);
+
     void Awake()
     {
         CacheMaterials();
+    }
+
+    // 🔹 PUBLIC: used by InteractionManager / TimedBotSequence to get subtitles for this item's audio
+    public SubtitleSegment[] GetSubtitlesForAudio()
+    {
+        // Reuse cached if already built
+        if (computedSubtitles != null && computedSubtitles.Length > 0)
+            return computedSubtitles;
+
+        // 1) If auto is OFF, but manual subtitles exist → use them
+        if (!autoGenerateSubtitles)
+        {
+            if (manualSubtitles != null && manualSubtitles.Length > 0)
+            {
+                computedSubtitles = manualSubtitles;
+                return computedSubtitles;
+            }
+            return null;
+        }
+
+        // 2) Auto-generate from text + audio length
+        if (interactionAudio == null)
+            return null;
+
+        if (string.IsNullOrWhiteSpace(autoSubtitleText))
+            return null;
+
+        List<string> chunks = autoSubtitleMode == AutoSubtitleMode.ByWords
+            ? BuildChunksByWords(autoSubtitleText, wordsPerSubtitle)
+            : BuildChunksByLines(autoSubtitleText);
+
+        if (chunks.Count == 0)
+            return null;
+
+        float clipLength = interactionAudio.length;
+        if (clipLength <= 0f)
+        {
+            // Fallback: 1 second per chunk if audio length isn't valid
+            clipLength = chunks.Count;
+        }
+
+        float slice = clipLength / chunks.Count;
+        computedSubtitles = new SubtitleSegment[chunks.Count];
+
+        for (int i = 0; i < chunks.Count; i++)
+        {
+            computedSubtitles[i] = new SubtitleSegment
+            {
+                timestamp = i * slice,
+                duration = slice,
+                text = chunks[i],
+                // backgroundColor uses default value from SubtitleSegment
+            };
+        }
+
+        return computedSubtitles;
+    }
+
+    // Split by lines (each non-empty line = one subtitle)
+    private List<string> BuildChunksByLines(string rawText)
+    {
+        string[] rawLines = rawText.Split('\n');
+        List<string> lines = new List<string>();
+
+        foreach (var raw in rawLines)
+        {
+            string line = raw.Trim();
+            if (!string.IsNullOrEmpty(line))
+                lines.Add(line);
+        }
+
+        return lines;
+    }
+
+    // Split by words, group into chunks of wordsPerSubtitle
+    private List<string> BuildChunksByWords(string rawText, int wordsPerChunk)
+    {
+        if (wordsPerChunk <= 0) wordsPerChunk = 6;
+
+        // Split on whitespace
+        char[] sep = { ' ', '\t', '\n', '\r' };
+        string[] words = rawText.Split(sep, StringSplitOptions.RemoveEmptyEntries);
+
+        List<string> chunks = new List<string>();
+        List<string> current = new List<string>();
+
+        for (int i = 0; i < words.Length; i++)
+        {
+            current.Add(words[i]);
+            if (current.Count >= wordsPerChunk)
+            {
+                chunks.Add(string.Join(" ", current));
+                current.Clear();
+            }
+        }
+
+        // Any leftover words
+        if (current.Count > 0)
+            chunks.Add(string.Join(" ", current));
+
+        return chunks;
     }
 
     void CacheMaterials()
@@ -112,6 +252,7 @@ public class InteractableItem : MonoBehaviour
                 }
             }
 
+            // reassign so Unity instantiates materials (instance per object)
             renderer.materials = materials;
         }
 
@@ -168,7 +309,7 @@ public class InteractableItem : MonoBehaviour
 
         while (true)
         {
-            // Check inspected at start of loop
+            // Stop glow once inspected
             if (inspected)
             {
                 StopHighlight();
@@ -189,7 +330,6 @@ public class InteractableItem : MonoBehaviour
                 }
             }
 
-            // Wait for interval instead of every frame (reduces lag)
             yield return new WaitForSeconds(updateInterval);
         }
     }
